@@ -1,0 +1,28 @@
+[project]
+name = "health-import"
+version = "0.1.0"
+description = "Import health data from various sources into SQLite"
+requires-python = ">=3.9"
+dependencies = [
+    "openpyxl>=3.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+dashboard = [
+    "streamlit>=1.28.0",
+    "pandas>=2.0.0",
+    "plotly>=5.18.0",
+]
+
+[project.scripts]
+health-import = "health_import.cli.main:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["health_import*", "dashboard*"]
