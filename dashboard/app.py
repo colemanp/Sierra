@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 from dashboard.utils.db import get_connection
-from dashboard.components.sidebar import render_sidebar
+from dashboard.components.sidebar import render_sidebar, show_import_result_dialog
 from dashboard.components.overview import render_overview
 from dashboard.components.activities import render_activities
 from dashboard.components.body import render_body
@@ -19,11 +19,24 @@ from dashboard.components.imports import render_imports
 
 
 def main():
+    # Show import result dialog if triggered
+    if st.session_state.get("show_import_dialog"):
+        show_import_result_dialog()
+
     # Render sidebar and get DB choice
     db_choice = render_sidebar()
 
+    # Check if DB selected
+    if db_choice is None:
+        st.info("Please select a database from the sidebar to continue.")
+        return
+
     # Get connection
     conn = get_connection(db_choice)
+
+    if conn is None:
+        st.warning("Database not found. Use 'Import Data' in the sidebar to create it.")
+        return
 
     # Main content tabs
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([

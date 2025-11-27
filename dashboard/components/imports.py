@@ -12,6 +12,19 @@ def render_imports(conn):
     """Render import management tab"""
     st.header("Import Management")
 
+    # Show last import result if exists
+    if "last_import_result" in st.session_state:
+        result = st.session_state["last_import_result"]
+        st.success("Import completed!")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Processed", result["processed"])
+        col2.metric("Inserted", result["inserted"])
+        col3.metric("Skipped", result["skipped"])
+        col4.metric("Conflicts", result["conflicted"])
+        st.divider()
+        # Clear after displaying
+        del st.session_state["last_import_result"]
+
     if conn is None:
         st.warning("No database connection")
         return
@@ -56,7 +69,7 @@ def render_imports(conn):
         return "⏳"
 
     display_df["Status"] = display_df["Status"].apply(status_color)
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    st.dataframe(display_df, width="stretch", hide_index=True)
 
     st.divider()
 
@@ -74,13 +87,13 @@ def render_imports(conn):
         col1, col2 = st.columns([1, 2])
 
         with col1:
-            st.dataframe(table_counts, use_container_width=True, hide_index=True)
+            st.dataframe(table_counts, width="stretch", hide_index=True)
 
         with col2:
             # Show recent conflicts
             display_df = conflicts_df[["id", "table_name", "record_key", "conflict_fields"]].head(20)
             display_df.columns = ["ID", "Table", "Record Key", "Fields"]
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            st.dataframe(display_df, width="stretch", hide_index=True)
 
         # Expandable conflict detail
         with st.expander("View Conflict Values"):

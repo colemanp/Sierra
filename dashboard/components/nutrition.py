@@ -57,7 +57,7 @@ def render_nutrition(conn):
                 line=dict(dash="dash", color="red")
             ))
         fig.update_layout(height=300, yaxis_title="Calories (kcal)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         # Calorie difference
         if "target" in nutrition_df.columns:
@@ -87,7 +87,7 @@ def render_nutrition(conn):
                 name="Carbs", mode="lines"
             ))
             fig.update_layout(height=250, yaxis_title="Grams")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     with col2:
         # Macro distribution pie
@@ -104,7 +104,7 @@ def render_nutrition(conn):
                     title="Avg Macro Split"
                 )
                 fig.update_layout(height=250)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
     st.divider()
 
@@ -114,4 +114,4 @@ def render_nutrition(conn):
     if not weekly_df.empty:
         display_df = weekly_df.copy()
         display_df.columns = ["Week", "Avg Cal", "Avg Protein", "Avg Fat", "Avg Carbs"]
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        st.dataframe(display_df, width="stretch", hide_index=True)

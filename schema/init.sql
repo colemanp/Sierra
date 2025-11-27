@@ -355,10 +355,14 @@ INSERT OR IGNORE INTO data_sources (name, description, file_pattern) VALUES
 INSERT OR IGNORE INTO activity_types (name, category, healthkit_type, garmin_type) VALUES
     ('running', 'cardio', 'HKWorkoutActivityTypeRunning', 'Running'),
     ('treadmill_running', 'cardio', 'HKWorkoutActivityTypeRunning', 'Treadmill Running'),
+    ('indoor_running', 'cardio', 'HKWorkoutActivityTypeRunning', 'Indoor Running'),
     ('walking', 'cardio', 'HKWorkoutActivityTypeWalking', 'Walking'),
     ('hiking', 'cardio', 'HKWorkoutActivityTypeHiking', 'Hiking'),
     ('cycling', 'cardio', 'HKWorkoutActivityTypeCycling', 'Cycling'),
-    ('ebiking', 'cardio', 'HKWorkoutActivityTypeCycling', 'E-Bike Ride'),
+    ('indoor_cycling', 'cardio', 'HKWorkoutActivityTypeCycling', 'Indoor Cycling'),
+    ('ebiking', 'cardio', 'HKWorkoutActivityTypeCycling', 'eBiking'),
+    ('mountain_biking', 'cardio', 'HKWorkoutActivityTypeCycling', 'Mountain Biking'),
+    ('emountain_biking', 'cardio', 'HKWorkoutActivityTypeCycling', 'eMountain Biking'),
     ('elliptical', 'cardio', 'HKWorkoutActivityTypeElliptical', 'Elliptical'),
     ('strength', 'strength', 'HKWorkoutActivityTypeFunctionalStrengthTraining', 'Strength Training'),
     ('swimming', 'cardio', 'HKWorkoutActivityTypeSwimming', 'Pool Swimming');

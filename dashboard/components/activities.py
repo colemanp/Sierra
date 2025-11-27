@@ -49,7 +49,7 @@ def render_activities(conn):
             title=""
         )
         fig.update_layout(showlegend=False, height=300)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     with col2:
         st.subheader("Miles by Type")
@@ -60,7 +60,7 @@ def render_activities(conn):
             title=""
         )
         fig.update_layout(height=300)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     # Weekly trend
     st.subheader("Weekly Activity Volume")
@@ -87,7 +87,7 @@ def render_activities(conn):
             height=300,
             legend=dict(orientation="h", yanchor="bottom", y=1.02)
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     st.divider()
 
@@ -95,7 +95,7 @@ def render_activities(conn):
     st.subheader("Activity Summary by Type")
     display_df = summary_df.copy()
     display_df.columns = ["Type", "Count", "Miles", "Calories", "Avg HR", "Avg Duration (min)"]
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    st.dataframe(display_df, width="stretch", hide_index=True)
 
     # Recent activities
     st.subheader("Recent Activities")
@@ -103,4 +103,4 @@ def render_activities(conn):
     if not recent_df.empty:
         display_df = recent_df.copy()
         display_df.columns = ["Date", "Type", "Title", "Miles", "Duration (min)", "Avg HR", "Calories"]
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        st.dataframe(display_df, width="stretch", hide_index=True)

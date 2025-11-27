@@ -12,14 +12,25 @@ DB_PATHS = {
 
 def get_connection(db_key: str = "prod") -> sqlite3.Connection:
     """Get database connection for specified environment"""
+    if db_key is None:
+        return None
+
     db_path = DB_PATHS.get(db_key, DB_PATHS["prod"])
 
     if not db_path.exists():
-        st.warning(f"Database not found: {db_path}")
         return None
 
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+
+    # Check if schema is initialized
+    try:
+        conn.execute("SELECT 1 FROM data_sources LIMIT 1")
+    except sqlite3.OperationalError:
+        # Schema not initialized
+        conn.close()
+        return None
+
     return conn
 
 

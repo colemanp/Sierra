@@ -47,7 +47,7 @@ def render_strength(conn):
             title=""
         )
         fig.update_layout(height=300, xaxis_tickangle=-45)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     with col2:
         st.subheader("By Category")
@@ -59,7 +59,7 @@ def render_strength(conn):
             title=""
         )
         fig.update_layout(height=300)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     st.divider()
 
@@ -89,7 +89,7 @@ def render_strength(conn):
                         line=dict(dash="dash")
                     ))
             fig.update_layout(height=300, yaxis_title="Total Reps/Value")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     st.divider()
 
@@ -97,7 +97,7 @@ def render_strength(conn):
     st.subheader("Exercise Summary")
     display_df = summary_df.copy()
     display_df.columns = ["Exercise", "Category", "Workouts", "Avg Total", "Max Total"]
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    st.dataframe(display_df, width="stretch", hide_index=True)
 
     # Recent workouts
     st.subheader("Recent Workouts")
@@ -105,4 +105,4 @@ def render_strength(conn):
     if not recent_df.empty:
         display_df = recent_df.copy()
         display_df.columns = ["Date", "Time", "Exercise", "Set1", "Set2", "Set3", "Set4", "Set5", "Total", "Cals"]
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        st.dataframe(display_df, width="stretch", hide_index=True)

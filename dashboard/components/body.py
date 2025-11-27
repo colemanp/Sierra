@@ -64,7 +64,7 @@ def render_body(conn):
             ))
 
         fig.update_layout(height=350, yaxis_title="Weight (lbs)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         # Show weight change
         if len(weight_df) > 1:
@@ -88,7 +88,7 @@ def render_body(conn):
                 title="Body Fat %"
             )
             fig.update_layout(height=250)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         with col2:
             if "body_water_pct" in weight_df.columns:
@@ -99,7 +99,7 @@ def render_body(conn):
                     title="Body Water %"
                 )
                 fig.update_layout(height=250)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
     st.divider()
 
@@ -116,7 +116,7 @@ def render_body(conn):
             markers=True
         )
         fig.update_layout(height=300, yaxis_title="VO2 Max (ml/kg/min)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         # Latest VO2 Max
         latest_vo2 = vo2_df.iloc[-1]
@@ -136,7 +136,7 @@ def render_body(conn):
             markers=True
         )
         fig.update_layout(height=250, yaxis_title="BPM")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         avg_rhr = rhr_df["resting_hr"].mean()
         st.caption(f"Average: {avg_rhr:.0f} bpm")

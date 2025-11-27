@@ -66,7 +66,7 @@ def render_overview(conn):
             # Simplify for display
             display_df = imports_df[["source", "import_timestamp", "records_inserted", "status"]].copy()
             display_df.columns = ["Source", "Time", "Inserted", "Status"]
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            st.dataframe(display_df, width="stretch", hide_index=True)
         else:
             st.info("No imports yet")
 
@@ -74,6 +74,6 @@ def render_overview(conn):
         st.subheader("Conflicts")
         conflicts_df = get_conflict_summary(conn)
         if not conflicts_df.empty:
-            st.dataframe(conflicts_df, use_container_width=True, hide_index=True)
+            st.dataframe(conflicts_df, width="stretch", hide_index=True)
         else:
             st.success("No conflicts")
