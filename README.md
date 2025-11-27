@@ -43,8 +43,23 @@ python -m health_import --db data/test/health_data.db import ...
 ## Dashboard
 
 ```bash
-streamlit run dashboard/app.py
+# Windows
+scripts\start_dashboard.bat
+
+# Or with venv activated
+.venv\Scripts\python.exe -m streamlit run dashboard/app.py
 ```
+
+### Hot Reload
+
+Streamlit auto-reloads on file changes. Restart required for:
+- Changes to `health_import/` (core library)
+- New dependencies in pyproject.toml
+- Schema changes (init.sql)
+
+No restart needed for:
+- Dashboard component changes (dashboard/)
+- Query changes (dashboard/utils/)
 
 ## Project Structure
 
