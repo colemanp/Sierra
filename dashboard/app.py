@@ -13,6 +13,7 @@ from dashboard.components.sidebar import render_sidebar, show_import_result_dial
 from dashboard.components.overview import render_overview
 from dashboard.components.activities import render_activities
 from dashboard.components.body import render_body
+from dashboard.components.weight import render_weight
 from dashboard.components.strength import render_strength
 from dashboard.components.nutrition import render_nutrition
 from dashboard.components.imports import render_imports
@@ -39,10 +40,11 @@ def main():
         return
 
     # Main content tabs
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "Overview",
         "Activities",
         "Body",
+        "Weight",
         "Strength",
         "Nutrition",
         "Imports"
@@ -58,12 +60,15 @@ def main():
         render_body(conn)
 
     with tab4:
-        render_strength(conn)
+        render_weight(conn)
 
     with tab5:
-        render_nutrition(conn)
+        render_strength(conn)
 
     with tab6:
+        render_nutrition(conn)
+
+    with tab7:
         render_imports(conn)
 
     # Close connection

@@ -89,10 +89,12 @@ def render_sidebar():
     }
 
     # File uploader - accept all supported types
+    # Use counter key to allow clearing the uploader after import
+    uploader_key = st.session_state.get("uploader_key", 0)
     uploaded_file = st.sidebar.file_uploader(
         "Upload file",
         type=["csv", "xml"],
-        key="import_file"
+        key=f"import_file_{uploader_key}"
     )
 
     # Auto-detect or manual source selection
@@ -192,9 +194,8 @@ def run_import(db_choice: str, source: str, uploaded_file):
         # Cleanup
         tmp_path.unlink()
 
-        # Clear file uploader
-        if "import_file" in st.session_state:
-            del st.session_state["import_file"]
+        # Clear file uploader by incrementing key
+        st.session_state["uploader_key"] = st.session_state.get("uploader_key", 0) + 1
         st.rerun()
 
     except Exception as e:
@@ -220,6 +221,4 @@ def show_import_result_dialog():
         st.session_state["show_import_dialog"] = False
         if "last_import_result" in st.session_state:
             del st.session_state["last_import_result"]
-        if "import_file" in st.session_state:
-            del st.session_state["import_file"]
         st.rerun()
