@@ -93,6 +93,17 @@ def get_activities_summary(conn: sqlite3.Connection) -> pd.DataFrame:
     return pd.read_sql_query(query, conn)
 
 
+def get_activities_date_range(conn: sqlite3.Connection) -> dict:
+    """Get earliest and latest activity dates"""
+    query = """
+    SELECT MIN(date(start_time)) as earliest,
+           MAX(date(start_time)) as latest
+    FROM activities
+    """
+    row = conn.execute(query).fetchone()
+    return {"earliest": row[0], "latest": row[1]} if row else {"earliest": None, "latest": None}
+
+
 def get_weekly_activities(conn: sqlite3.Connection) -> pd.DataFrame:
     """Get weekly activity volume"""
     query = """

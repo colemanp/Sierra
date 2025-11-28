@@ -325,6 +325,23 @@ CREATE TABLE IF NOT EXISTS daily_activity_summary (
 );
 
 -- ============================================
+-- MCP REQUESTS (for dashboard monitoring)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS mcp_requests (
+    id INTEGER PRIMARY KEY,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    tool_name TEXT NOT NULL,
+    params TEXT,
+    response TEXT,
+    response_tokens INTEGER,
+    duration_ms INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_requests_timestamp ON mcp_requests(timestamp);
+CREATE INDEX IF NOT EXISTS idx_mcp_requests_tool ON mcp_requests(tool_name);
+
+-- ============================================
 -- INDEXES
 -- ============================================
 

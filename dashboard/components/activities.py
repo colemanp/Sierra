@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dashboard.utils.queries import (
     get_activities_summary,
+    get_activities_date_range,
     get_weekly_activities,
     get_recent_activities,
 )
@@ -28,11 +29,14 @@ def render_activities(conn):
     total_activities = summary_df["count"].sum()
     total_miles = summary_df["total_miles"].sum() or 0
     total_calories = summary_df["total_calories"].sum() or 0
+    date_range = get_activities_date_range(conn)
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Total Activities", f"{total_activities:,}")
     col2.metric("Total Miles", f"{total_miles:,.1f}")
     col3.metric("Total Calories", f"{total_calories:,.0f}")
+    col4.metric("Earliest", date_range["earliest"] or "-")
+    col5.metric("Latest", date_range["latest"] or "-")
 
     st.divider()
 

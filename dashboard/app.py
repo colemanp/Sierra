@@ -17,6 +17,7 @@ from dashboard.components.weight import render_weight
 from dashboard.components.strength import render_strength
 from dashboard.components.nutrition import render_nutrition
 from dashboard.components.imports import render_imports
+from dashboard.components.mcp import render_mcp
 
 
 def main():
@@ -40,14 +41,15 @@ def main():
         return
 
     # Main content tabs
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
         "Overview",
         "Activities",
         "Body",
         "Weight",
         "Strength",
         "Nutrition",
-        "Imports"
+        "Imports",
+        "MCP"
     ])
 
     with tab1:
@@ -70,6 +72,9 @@ def main():
 
     with tab7:
         render_imports(conn)
+
+    with tab8:
+        render_mcp(conn)
 
     # Close connection
     if conn:
