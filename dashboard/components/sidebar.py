@@ -16,8 +16,6 @@ def detect_source_type(filename: str, content: bytes) -> str:
     filename_lower = filename.lower()
 
     # Check file extension first
-    if filename_lower.endswith('.xlsx'):
-        return "macrofactor"
     if filename_lower.endswith('.xml'):
         return "apple-resting-hr"
 
@@ -40,6 +38,9 @@ def detect_source_type(filename: str, content: bytes) -> str:
             # Check for semicolon delimiter (6-week uses semicolons)
             if ';' in first_line and 'goal' in first_line:
                 return "six-week"
+            # MacroFactor CSV export
+            if 'food name' in first_line and 'calories' in first_line and 'serving' in first_line:
+                return "macrofactor"
         except:
             pass
 
@@ -83,14 +84,14 @@ def render_sidebar():
         "garmin-weight": "Garmin Weight (CSV)",
         "garmin-vo2max": "Garmin VO2 Max (CSV)",
         "six-week": "6-Week Challenge (CSV)",
-        "macrofactor": "MacroFactor (XLSX)",
+        "macrofactor": "MacroFactor (CSV)",
         "apple-resting-hr": "Apple Resting HR (XML)",
     }
 
     # File uploader - accept all supported types
     uploaded_file = st.sidebar.file_uploader(
         "Upload file",
-        type=["csv", "xlsx", "xml"],
+        type=["csv", "xml"],
         key="import_file"
     )
 
@@ -153,16 +154,16 @@ def run_import(db_choice: str, source: str, uploaded_file):
     # Validate file extension matches source type
     filename = uploaded_file.name.lower()
     expected_ext = {
-        "garmin-activities": ".csv",
-        "garmin-weight": ".csv",
-        "garmin-vo2max": ".csv",
-        "six-week": ".csv",
-        "macrofactor": ".xlsx",
-        "apple-resting-hr": ".xml",
+        "garmin-activities": [".csv"],
+        "garmin-weight": [".csv"],
+        "garmin-vo2max": [".csv"],
+        "six-week": [".csv"],
+        "macrofactor": [".csv"],
+        "apple-resting-hr": [".xml"],
     }
 
-    if not filename.endswith(expected_ext[source]):
-        st.sidebar.error(f"File type mismatch: {source} expects {expected_ext[source]} file")
+    if not any(filename.endswith(ext) for ext in expected_ext[source]):
+        st.sidebar.error(f"File type mismatch: {source} expects {'/'.join(expected_ext[source])} file")
         return
 
     try:

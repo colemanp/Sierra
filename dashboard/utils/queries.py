@@ -26,7 +26,7 @@ def get_table_stats(conn: sqlite3.Connection) -> pd.DataFrame:
         ("garmin_vo2max", "measurement_date", "VO2 Max"),
         ("resting_heart_rate", "measurement_date", "Resting HR"),
         ("strength_workouts", "workout_date", "Strength Workouts"),
-        ("nutrition_daily", "date", "Nutrition Daily"),
+        ("nutrition_entries", "date", "Nutrition Entries"),
     ]
 
     results = []
@@ -215,32 +215,43 @@ def get_recent_workouts(conn: sqlite3.Connection, limit: int = 20) -> pd.DataFra
     return pd.read_sql_query(query, conn, params=(limit,))
 
 
-# Nutrition queries
+# Nutrition queries (aggregated from nutrition_entries)
 def get_nutrition_summary(conn: sqlite3.Connection, days: int = 30) -> pd.DataFrame:
-    """Get nutrition daily summary"""
+    """Get nutrition daily summary aggregated from food entries"""
     query = f"""
     SELECT date,
-           calories_consumed_kcal as calories,
-           target_calories_kcal as target,
-           protein_g, fat_g, carbs_g, fiber_g
-    FROM nutrition_daily
+           ROUND(SUM(calories_kcal), 0) as calories,
+           ROUND(SUM(protein_g), 1) as protein_g,
+           ROUND(SUM(fat_g), 1) as fat_g,
+           ROUND(SUM(carbs_g), 1) as carbs_g,
+           ROUND(SUM(fiber_g), 1) as fiber_g
+    FROM nutrition_entries
     WHERE date >= date('now', '-{days} days')
+    GROUP BY date
     ORDER BY date
     """
     return pd.read_sql_query(query, conn)
 
 
 def get_nutrition_averages(conn: sqlite3.Connection, days: int = 30) -> Optional[dict]:
-    """Get average nutrition metrics"""
+    """Get average nutrition metrics from food entries"""
     query = f"""
-    SELECT ROUND(AVG(calories_consumed_kcal), 0) as avg_calories,
-           ROUND(AVG(target_calories_kcal), 0) as avg_target,
-           ROUND(AVG(protein_g), 1) as avg_protein,
-           ROUND(AVG(fat_g), 1) as avg_fat,
-           ROUND(AVG(carbs_g), 1) as avg_carbs,
-           ROUND(AVG(fiber_g), 1) as avg_fiber
-    FROM nutrition_daily
-    WHERE date >= date('now', '-{days} days')
+    SELECT ROUND(AVG(daily_cal), 0) as avg_calories,
+           ROUND(AVG(daily_protein), 1) as avg_protein,
+           ROUND(AVG(daily_fat), 1) as avg_fat,
+           ROUND(AVG(daily_carbs), 1) as avg_carbs,
+           ROUND(AVG(daily_fiber), 1) as avg_fiber
+    FROM (
+        SELECT date,
+               SUM(calories_kcal) as daily_cal,
+               SUM(protein_g) as daily_protein,
+               SUM(fat_g) as daily_fat,
+               SUM(carbs_g) as daily_carbs,
+               SUM(fiber_g) as daily_fiber
+        FROM nutrition_entries
+        WHERE date >= date('now', '-{days} days')
+        GROUP BY date
+    )
     """
     df = pd.read_sql_query(query, conn)
     if len(df) > 0:
@@ -249,14 +260,22 @@ def get_nutrition_averages(conn: sqlite3.Connection, days: int = 30) -> Optional
 
 
 def get_weekly_nutrition(conn: sqlite3.Connection) -> pd.DataFrame:
-    """Get weekly nutrition averages"""
+    """Get weekly nutrition averages from food entries"""
     query = """
-    SELECT strftime('%Y-%W', date) as week,
-           ROUND(AVG(calories_consumed_kcal), 0) as avg_calories,
-           ROUND(AVG(protein_g), 1) as avg_protein,
-           ROUND(AVG(fat_g), 1) as avg_fat,
-           ROUND(AVG(carbs_g), 1) as avg_carbs
-    FROM nutrition_daily
+    SELECT week,
+           ROUND(AVG(daily_cal), 0) as avg_calories,
+           ROUND(AVG(daily_protein), 1) as avg_protein,
+           ROUND(AVG(daily_fat), 1) as avg_fat,
+           ROUND(AVG(daily_carbs), 1) as avg_carbs
+    FROM (
+        SELECT strftime('%Y-%W', date) as week, date,
+               SUM(calories_kcal) as daily_cal,
+               SUM(protein_g) as daily_protein,
+               SUM(fat_g) as daily_fat,
+               SUM(carbs_g) as daily_carbs
+        FROM nutrition_entries
+        GROUP BY date
+    )
     GROUP BY week
     ORDER BY week DESC
     LIMIT 12

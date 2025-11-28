@@ -10,7 +10,7 @@ Health/fitness data import system. Consolidates data from multiple sources into 
 | Garmin Weight | CSV | weight, BMI, body fat, muscle mass |
 | Garmin VO2 Max | CSV | VO2max tracking |
 | 6-Week Challenge | CSV | strength sets/reps |
-| MacroFactor | XLSX | nutrition, macros |
+| MacroFactor | CSV | nutrition, macros, food entries |
 | Apple HealthKit | XML | resting heart rate |
 
 ## Install
@@ -27,7 +27,7 @@ python -m health_import import garmin-activities path/to/file.csv
 python -m health_import import garmin-weight path/to/file.csv
 python -m health_import import garmin-vo2max path/to/file.csv
 python -m health_import import six-week path/to/file.csv
-python -m health_import import macrofactor path/to/file.xlsx
+python -m health_import import macrofactor path/to/file.csv
 
 # Inspect database
 python -m health_import inspect --table activities

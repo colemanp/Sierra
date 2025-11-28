@@ -45,25 +45,11 @@ def render_nutrition(conn):
         fig.add_trace(go.Scatter(
             x=nutrition_df["date"],
             y=nutrition_df["calories"],
-            name="Consumed",
+            name="Calories",
             mode="lines+markers"
         ))
-        if "target" in nutrition_df.columns:
-            fig.add_trace(go.Scatter(
-                x=nutrition_df["date"],
-                y=nutrition_df["target"],
-                name="Target",
-                mode="lines",
-                line=dict(dash="dash", color="red")
-            ))
         fig.update_layout(height=300, yaxis_title="Calories (kcal)")
         st.plotly_chart(fig, width="stretch")
-
-        # Calorie difference
-        if "target" in nutrition_df.columns:
-            nutrition_df["diff"] = nutrition_df["calories"] - nutrition_df["target"]
-            avg_diff = nutrition_df["diff"].mean()
-            st.caption(f"Avg vs target: {avg_diff:+.0f} kcal/day")
 
     st.divider()
 

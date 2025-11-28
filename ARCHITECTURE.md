@@ -10,7 +10,7 @@ Python system to import health/fitness data from multiple sources into normalize
 | Garmin Weight | CSV | comma (multiline) | weight, BMI, body fat, muscle/bone mass |
 | Garmin VO2 Max | CSV | comma | date, activity type, vo2max value |
 | 6-Week Challenge | CSV | semicolon | strength sets/reps (push-ups, pull-ups, plank) |
-| MacroFactor | XLSX | n/a | nutrition, macros, micros, food entries |
+| MacroFactor | CSV | comma | nutrition, macros, micros, individual food entries |
 | Apple HealthKit | XML | n/a | 872MB - design reference only for now |
 
 ## Storage

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(C:/dev/python/Sierra/.venv/Scripts/python.exe:*)",
+      "Bash(C:/dev/python/Sierra/.venv/Scripts/pip.exe install:*)",
+      "Bash(C:/dev/python/Sierra/.venv/Scripts/pip.exe list:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
