@@ -1,6 +1,6 @@
 # MCP Server - Sierra Health
 
-Model Context Protocol server for Claude Desktop. Exposes health data (weight/body composition, nutrition, activity, resting heart rate, and VO2 Max) with LLM-optimized query patterns.
+Model Context Protocol server for Claude Desktop. Exposes health data (weight/body composition, nutrition, activity, resting heart rate, VO2 Max, and strength training) with LLM-optimized query patterns.
 
 ## Claude Desktop Setup
 
@@ -411,6 +411,93 @@ Statistical summary. ~15 tokens.
 }
 ```
 
+## Strength Tools
+
+### strength_summary
+
+Quick overview - latest workout + exercise count + date range. ~40 tokens.
+
+```json
+{
+  "last": {"d": "2025-11-27", "ex": "Push up", "tot": 46.0},
+  "rng": {"s": "2024-01-24", "e": "2025-11-27", "n": 93},
+  "ex": 4
+}
+```
+
+### strength_trend
+
+Aggregated by period. ~60-200 tokens.
+
+**Parameters:**
+- `period`: week | month | quarter | year
+- `limit`: number of periods (default 12)
+- `exercise`: filter by exercise name (optional)
+
+```json
+{
+  "d": [
+    {"p": "2025-10", "n": 4, "tot": 218.0, "exs": 1},
+    {"p": "2025-11", "n": 12, "tot": 736.0, "exs": 3}
+  ]
+}
+```
+
+### strength_records
+
+Paginated workout records. ~25 tokens per record.
+
+**Parameters:**
+- `exercise`: filter by exercise name (optional)
+- `start_date`: YYYY-MM-DD (optional)
+- `end_date`: YYYY-MM-DD (optional)
+- `page`: page number (default 1)
+- `page_size`: records per page (default 20, max 50)
+
+```json
+{
+  "r": [
+    {"d": "2025-11-27", "t": "14:03", "ex": "Push up", "s": [11, 14, 11, 10, 0], "tot": 46, "cal": 13}
+  ],
+  "pg": 1,
+  "pgs": 19,
+  "n": 93
+}
+```
+
+### strength_stats
+
+Statistical summary. ~60 tokens.
+
+**Parameters:**
+- `exercise`: filter by exercise name (optional)
+- `start_date`: YYYY-MM-DD (optional)
+- `end_date`: YYYY-MM-DD (optional)
+
+```json
+{
+  "n": 93,
+  "tot": {"sum": 3694, "avg": 39.7},
+  "exs": [
+    {"ex": "Push up", "n": 50, "avg": 45.1, "max": 70},
+    {"ex": "Pull-ups", "n": 22, "avg": 11.0, "max": 17}
+  ]
+}
+```
+
+### strength_exercises
+
+List all exercises with workout counts. ~15 tokens per exercise.
+
+```json
+{
+  "ex": [
+    {"id": 4, "name": "Push up", "cat": "upper_body", "n": 50},
+    {"id": 2, "name": "Pull-ups", "cat": "upper_body", "n": 22}
+  ]
+}
+```
+
 ## Token Efficiency
 
 Key mappings:
@@ -418,6 +505,7 @@ Key mappings:
 - `cal`=calories, `prot`=protein (in trend), `p`=protein (elsewhere), `f`=fat, `c`=carbs
 - `type`=activity_type, `dur`=duration (minutes), `dist`=distance (miles), `pace`=min/mile, `hr`=heart rate
 - `vo2`=VO2 Max (ml/kg/min)
+- `ex`=exercise, `cat`=category, `s`=sets (array), `tot`=total, `exs`=exercises count or list
 - `cur`=current/latest, `last`=latest, `rng`=range, `s`=start, `e`=end, `n`=count
 - `tot`=total, `items`=food items, `p`=period (in trend), `best`=best value
 - `r`=records, `pg`=page, `pgs`=pages
@@ -449,7 +537,8 @@ health_import/mcp/
 ├── nutrition.py   # Nutrition tool implementations
 ├── activity.py    # Activity tool implementations
 ├── resting_hr.py  # Resting HR tool implementations
-└── vo2max.py      # VO2 Max tool implementations
+├── vo2max.py      # VO2 Max tool implementations
+└── strength.py    # Strength tool implementations
 ```
 
 Logs: `logs/mcp.log`

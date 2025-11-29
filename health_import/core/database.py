@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 DEFAULT_DB_PATH = Path("data/prod/health_data.db")
+TEST_DB_PATH = Path("data/test/health_data.db")
 SCHEMA_PATH = Path(__file__).parent.parent.parent / "schema" / "init.sql"
 
 
@@ -87,11 +88,18 @@ class Database:
         return row["id"] if row else None
 
     def get_exercise_id(self, name: str) -> Optional[int]:
-        """Get exercise ID by name or display_name"""
+        """Get exercise ID by name or display_name (with normalization)"""
+        # Normalize: lowercase, replace spaces/hyphens with underscore
+        normalized = name.lower().replace(" ", "_").replace("-", "_")
+        # Also try without trailing 's' for singular/plural matching
+        normalized_singular = normalized.rstrip("s") if normalized.endswith("s") else normalized
+
         cursor = self.conn.execute(
             """SELECT id FROM strength_exercises
-               WHERE name = ? OR display_name = ?""",
-            (name, name)
+               WHERE name = ? OR display_name = ?
+               OR name = ? OR name = ?
+               OR name || 's' = ? OR ? || 's' = name""",
+            (name, name, normalized, normalized_singular, normalized, normalized)
         )
         row = cursor.fetchone()
         return row["id"] if row else None

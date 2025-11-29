@@ -116,7 +116,7 @@ def get_vo2max_trend(period: str = "month", limit: int = 12) -> dict:
         for row in rows:
             data.append({
                 "p": row["p"],
-                "avg": _round1(row["avg_vo2"]),
+                "vo2": _round1(row["avg_vo2"]),
                 "min": _round1(row["min_vo2"]),
                 "max": _round1(row["max_vo2"]),
                 "n": row["n"],
@@ -222,6 +222,54 @@ def get_vo2max_stats(
             "min": _round1(row["min_vo2"]),
             "max": _round1(row["max_vo2"]),
             "std": _round1(std),
+        }
+    finally:
+        conn.close()
+
+
+def get_vo2max_compare(
+    period1_start: str,
+    period1_end: str,
+    period2_start: str,
+    period2_end: str,
+) -> dict:
+    """Compare VO2 Max between two periods (running only)"""
+    conn = _get_conn()
+    try:
+        def get_period_stats(start: str, end: str) -> dict:
+            row = conn.execute("""
+                SELECT COUNT(*) as n,
+                       AVG(vo2max_value) as avg_vo2,
+                       MIN(vo2max_value) as min_vo2,
+                       MAX(vo2max_value) as max_vo2
+                FROM garmin_vo2max
+                WHERE activity_type = 'running'
+                  AND measurement_date >= ? AND measurement_date <= ?
+            """, (start, end)).fetchone()
+
+            if not row or row["n"] == 0:
+                return None
+
+            return {
+                "rng": f"{start}/{end}",
+                "vo2": _round1(row["avg_vo2"]),
+                "min": _round1(row["min_vo2"]),
+                "max": _round1(row["max_vo2"]),
+                "n": row["n"],
+            }
+
+        p1 = get_period_stats(period1_start, period1_end)
+        p2 = get_period_stats(period2_start, period2_end)
+
+        if not p1 or not p2:
+            return {"err": "No data in one or both periods"}
+
+        return {
+            "p1": p1,
+            "p2": p2,
+            "d": {
+                "vo2": _round1(p2["vo2"] - p1["vo2"]),
+            },
         }
     finally:
         conn.close()

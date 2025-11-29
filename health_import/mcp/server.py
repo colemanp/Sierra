@@ -52,12 +52,22 @@ from health_import.mcp.resting_hr import (
     get_rhr_trend,
     get_rhr_records,
     get_rhr_stats,
+    get_rhr_compare,
 )
 from health_import.mcp.vo2max import (
     get_vo2max_summary,
     get_vo2max_trend,
     get_vo2max_records,
     get_vo2max_stats,
+    get_vo2max_compare,
+)
+from health_import.mcp.strength import (
+    get_strength_summary,
+    get_strength_trend,
+    get_strength_records,
+    get_strength_stats,
+    get_strength_exercises,
+    get_strength_compare,
 )
 
 # Setup logging
@@ -128,12 +138,13 @@ def log_mcp_request(
 mcp = FastMCP(
     name="sierra-health",
     instructions=(
-        "Health metrics tool for weight, nutrition, activity, resting heart rate, and VO2 Max data. "
+        "Health metrics tool for weight, nutrition, activity, resting heart rate, VO2 Max, and strength data. "
         "Weight tools: weight_summary, weight_trend, weight_records, weight_stats, weight_compare. "
         "Nutrition tools: nutrition_summary, nutrition_trend, nutrition_day, nutrition_stats, nutrition_compare. "
         "Activity tools: activity_summary, activity_trend, activity_records, activity_stats, activity_compare. "
-        "Resting HR tools: rhr_summary, rhr_trend, rhr_records, rhr_stats. "
-        "VO2 Max tools: vo2max_summary, vo2max_trend, vo2max_records, vo2max_stats."
+        "Resting HR tools: rhr_summary, rhr_trend, rhr_records, rhr_stats, rhr_compare. "
+        "VO2 Max tools: vo2max_summary, vo2max_trend, vo2max_records, vo2max_stats, vo2max_compare. "
+        "Strength tools: strength_summary, strength_trend, strength_records, strength_stats, strength_exercises, strength_compare."
     ),
 )
 
@@ -821,6 +832,54 @@ async def rhr_stats(start_date: str = None, end_date: str = None) -> dict:
         return {"error": str(e)}
 
 
+@mcp.tool()
+async def rhr_compare(
+    period1_start: str,
+    period1_end: str,
+    period2_start: str,
+    period2_end: str,
+) -> dict:
+    """
+    Compare resting heart rate between two time periods.
+
+    Args:
+        period1_start: First period start (YYYY-MM-DD)
+        period1_end: First period end (YYYY-MM-DD)
+        period2_start: Second period start (YYYY-MM-DD)
+        period2_end: Second period end (YYYY-MM-DD)
+
+    Returns averages for each period and delta between them (~50 tokens).
+    """
+    logger.info(
+        f"MCP Tool Call: rhr_compare({period1_start}-{period1_end} vs "
+        f"{period2_start}-{period2_end})"
+    )
+    start = time.time()
+    try:
+        result = get_rhr_compare(
+            period1_start, period1_end, period2_start, period2_end
+        )
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"rhr_compare: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "rhr_compare",
+            {
+                "period1_start": period1_start,
+                "period1_end": period1_end,
+                "period2_start": period2_start,
+                "period2_end": period2_end,
+            },
+            result,
+            duration_ms,
+            result["_tokens"],
+        )
+        return result
+    except Exception as e:
+        logger.error(f"rhr_compare error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
 # ============================================================================
 # VO2 Max Tools
 # ============================================================================
@@ -953,6 +1012,279 @@ async def vo2max_stats(start_date: str = None, end_date: str = None) -> dict:
         return result
     except Exception as e:
         logger.error(f"vo2max_stats error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def vo2max_compare(
+    period1_start: str,
+    period1_end: str,
+    period2_start: str,
+    period2_end: str,
+) -> dict:
+    """
+    Compare VO2 Max between two time periods (running only).
+
+    Args:
+        period1_start: First period start (YYYY-MM-DD)
+        period1_end: First period end (YYYY-MM-DD)
+        period2_start: Second period start (YYYY-MM-DD)
+        period2_end: Second period end (YYYY-MM-DD)
+
+    Returns averages for each period and delta between them (~50 tokens).
+    """
+    logger.info(
+        f"MCP Tool Call: vo2max_compare({period1_start}-{period1_end} vs "
+        f"{period2_start}-{period2_end})"
+    )
+    start = time.time()
+    try:
+        result = get_vo2max_compare(
+            period1_start, period1_end, period2_start, period2_end
+        )
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"vo2max_compare: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "vo2max_compare",
+            {
+                "period1_start": period1_start,
+                "period1_end": period1_end,
+                "period2_start": period2_start,
+                "period2_end": period2_end,
+            },
+            result,
+            duration_ms,
+            result["_tokens"],
+        )
+        return result
+    except Exception as e:
+        logger.error(f"vo2max_compare error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+# ============================================================================
+# Strength Tools
+# ============================================================================
+
+
+@mcp.tool()
+async def strength_summary() -> dict:
+    """
+    Quick overview of strength training data.
+
+    Returns latest workout, date range, record count, and unique exercise count.
+    Optimized for minimal tokens (~40).
+    """
+    logger.info("MCP Tool Call: strength_summary()")
+    start = time.time()
+    try:
+        result = get_strength_summary()
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"strength_summary: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request("strength_summary", {}, result, duration_ms, result["_tokens"])
+        return result
+    except Exception as e:
+        logger.error(f"strength_summary error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def strength_trend(
+    period: str = "month",
+    limit: int = 12,
+    exercise: str = None,
+) -> dict:
+    """
+    Aggregated strength training data by time period.
+
+    Args:
+        period: Aggregation period - week, month, quarter, or year
+        limit: Number of periods to return (default 12)
+        exercise: Filter by exercise name (optional)
+
+    Returns workout count, total reps, unique exercises per period (~60-200 tokens).
+    """
+    logger.info(f"MCP Tool Call: strength_trend(period={period}, limit={limit}, exercise={exercise})")
+    start = time.time()
+    try:
+        result = get_strength_trend(period, limit, exercise)
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"strength_trend: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "strength_trend",
+            {"period": period, "limit": limit, "exercise": exercise},
+            result,
+            duration_ms,
+            result["_tokens"],
+        )
+        return result
+    except Exception as e:
+        logger.error(f"strength_trend error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def strength_records(
+    exercise: str = None,
+    start_date: str = None,
+    end_date: str = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict:
+    """
+    Paginated strength workout records.
+
+    Args:
+        exercise: Filter by exercise name (optional)
+        start_date: Filter start (YYYY-MM-DD), optional
+        end_date: Filter end (YYYY-MM-DD), optional
+        page: Page number (default 1)
+        page_size: Records per page (default 20, max 50)
+
+    Returns individual workouts with sets, totals, and calories.
+    ~25 tokens per record.
+    """
+    logger.info(
+        f"MCP Tool Call: strength_records(exercise={exercise}, start={start_date}, "
+        f"end={end_date}, page={page}, size={page_size})"
+    )
+    start = time.time()
+    try:
+        result = get_strength_records(exercise, start_date, end_date, page, min(page_size, 50))
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"strength_records: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "strength_records",
+            {
+                "exercise": exercise,
+                "start_date": start_date,
+                "end_date": end_date,
+                "page": page,
+                "page_size": page_size,
+            },
+            result,
+            duration_ms,
+            result["_tokens"],
+        )
+        return result
+    except Exception as e:
+        logger.error(f"strength_records error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def strength_stats(
+    exercise: str = None,
+    start_date: str = None,
+    end_date: str = None,
+) -> dict:
+    """
+    Statistical summary of strength training.
+
+    Args:
+        exercise: Filter by exercise name (optional)
+        start_date: Filter start (YYYY-MM-DD), optional
+        end_date: Filter end (YYYY-MM-DD), optional
+
+    Returns total workouts, sum/avg totals, and per-exercise breakdown (~60 tokens).
+    """
+    logger.info(
+        f"MCP Tool Call: strength_stats(exercise={exercise}, start={start_date}, end={end_date})"
+    )
+    start = time.time()
+    try:
+        result = get_strength_stats(exercise, start_date, end_date)
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"strength_stats: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "strength_stats",
+            {
+                "exercise": exercise,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+            result,
+            duration_ms,
+            result["_tokens"],
+        )
+        return result
+    except Exception as e:
+        logger.error(f"strength_stats error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def strength_exercises() -> dict:
+    """
+    List all exercises with workout counts.
+
+    Returns exercise names, categories, and workout counts.
+    ~15 tokens per exercise.
+    """
+    logger.info("MCP Tool Call: strength_exercises()")
+    start = time.time()
+    try:
+        result = get_strength_exercises()
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"strength_exercises: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request("strength_exercises", {}, result, duration_ms, result["_tokens"])
+        return result
+    except Exception as e:
+        logger.error(f"strength_exercises error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def strength_compare(
+    period1_start: str,
+    period1_end: str,
+    period2_start: str,
+    period2_end: str,
+) -> dict:
+    """
+    Compare strength training between two time periods.
+
+    Args:
+        period1_start: First period start (YYYY-MM-DD)
+        period1_end: First period end (YYYY-MM-DD)
+        period2_start: Second period start (YYYY-MM-DD)
+        period2_end: Second period end (YYYY-MM-DD)
+
+    Returns workout count and totals for each period and delta (~50 tokens).
+    """
+    logger.info(
+        f"MCP Tool Call: strength_compare({period1_start}-{period1_end} vs "
+        f"{period2_start}-{period2_end})"
+    )
+    start = time.time()
+    try:
+        result = get_strength_compare(
+            period1_start, period1_end, period2_start, period2_end
+        )
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"strength_compare: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "strength_compare",
+            {
+                "period1_start": period1_start,
+                "period1_end": period1_end,
+                "period2_start": period2_start,
+                "period2_end": period2_end,
+            },
+            result,
+            duration_ms,
+            result["_tokens"],
+        )
+        return result
+    except Exception as e:
+        logger.error(f"strength_compare error: {e}", exc_info=True)
         return {"error": str(e)}
 
 

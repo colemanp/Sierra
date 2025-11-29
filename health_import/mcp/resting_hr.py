@@ -212,12 +212,76 @@ def get_rhr_stats(
         hr_values = [v["resting_hr"] for v in values]
         std = statistics.stdev(hr_values) if len(hr_values) > 1 else 0
 
-        return {
+        # Get first and last readings for change calculation
+        first = conn.execute(f"""
+            SELECT resting_hr FROM resting_heart_rate {where}
+            ORDER BY measurement_date ASC LIMIT 1
+        """, params).fetchone()
+        last = conn.execute(f"""
+            SELECT resting_hr FROM resting_heart_rate {where}
+            ORDER BY measurement_date DESC LIMIT 1
+        """, params).fetchone()
+
+        result = {
             "n": row["n"],
             "avg": _round0(row["avg_hr"]),
             "min": row["min_hr"],
             "max": row["max_hr"],
             "std": _round0(std),
+        }
+
+        if first and last and row["n"] > 1:
+            result["chg"] = last["resting_hr"] - first["resting_hr"]
+
+        return result
+    finally:
+        conn.close()
+
+
+def get_rhr_compare(
+    period1_start: str,
+    period1_end: str,
+    period2_start: str,
+    period2_end: str,
+) -> dict:
+    """Compare resting heart rate between two periods"""
+    conn = _get_conn()
+    try:
+        def get_period_stats(start: str, end: str) -> dict:
+            row = conn.execute("""
+                SELECT COUNT(*) as n,
+                       AVG(resting_hr) as avg_hr,
+                       MIN(resting_hr) as min_hr,
+                       MAX(resting_hr) as max_hr
+                FROM resting_heart_rate
+                WHERE measurement_date >= ? AND measurement_date <= ?
+            """, (start, end)).fetchone()
+
+            if not row or row["n"] == 0:
+                return None
+
+            return {
+                "rng": f"{start}/{end}",
+                "avg": _round0(row["avg_hr"]),
+                "min": row["min_hr"],
+                "max": row["max_hr"],
+                "n": row["n"],
+            }
+
+        p1 = get_period_stats(period1_start, period1_end)
+        p2 = get_period_stats(period2_start, period2_end)
+
+        if not p1 or not p2:
+            return {"err": "No data in one or both periods"}
+
+        return {
+            "p1": p1,
+            "p2": p2,
+            "d": {
+                "avg": p2["avg"] - p1["avg"],
+                "min": p2["min"] - p1["min"],
+                "max": p2["max"] - p1["max"],
+            },
         }
     finally:
         conn.close()

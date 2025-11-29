@@ -43,6 +43,13 @@ from health_import.mcp.vo2max import (
     get_vo2max_records,
     get_vo2max_stats,
 )
+from health_import.mcp.strength import (
+    get_strength_summary,
+    get_strength_trend,
+    get_strength_records,
+    get_strength_stats,
+    get_strength_exercises,
+)
 
 
 def estimate_tokens(data: dict) -> int:
@@ -522,6 +529,111 @@ def test_vo2max_stats():
     return tokens
 
 
+# ============================================================================
+# Strength Tests
+# ============================================================================
+
+
+def test_strength_summary():
+    """Test strength_summary - should be ~40 tokens"""
+    result = get_strength_summary()
+    tokens = estimate_tokens(result)
+    print(f"\n=== strength_summary ===")
+    print(f"Result: {json.dumps(result, indent=2)}")
+    print(f"Tokens: {tokens}")
+
+    if "err" in result:
+        print("[SKIP] No strength data")
+        return tokens
+
+    assert "last" in result, "Missing 'last' field"
+    assert "rng" in result, "Missing 'rng' field"
+    assert "ex" in result, "Missing 'ex' field"
+    assert tokens < 80, f"Token count too high: {tokens} > 80"
+    print("[PASS]")
+    return tokens
+
+
+def test_strength_trend():
+    """Test strength_trend - should scale with limit"""
+    result = get_strength_trend("month", 3)
+    tokens = estimate_tokens(result)
+    print(f"\n=== strength_trend (3 months) ===")
+    print(f"Result: {json.dumps(result, indent=2)}")
+    print(f"Tokens: {tokens}")
+
+    if "err" in result:
+        print("[SKIP] No strength data")
+        return tokens
+
+    assert "d" in result, "Missing 'd' field"
+    assert len(result["d"]) <= 3, f"Too many periods: {len(result['d'])}"
+    if result["d"]:
+        assert "p" in result["d"][0], "Missing 'p' (period) in trend data"
+        assert "n" in result["d"][0], "Missing 'n' in trend data"
+        assert "tot" in result["d"][0], "Missing 'tot' in trend data"
+    assert tokens < 120, f"Token count too high: {tokens} > 120"
+    print("[PASS]")
+    return tokens
+
+
+def test_strength_records():
+    """Test strength_records - should paginate properly"""
+    result = get_strength_records(page=1, page_size=5)
+    tokens = estimate_tokens(result)
+    print(f"\n=== strength_records (5 records) ===")
+    print(f"Result: {json.dumps(result, indent=2)}")
+    print(f"Tokens: {tokens}")
+
+    assert "r" in result, "Missing 'r' field"
+    assert "pg" in result, "Missing 'pg' field"
+    assert "pgs" in result, "Missing 'pgs' field"
+    assert "n" in result, "Missing 'n' field"
+    assert len(result["r"]) <= 5, f"Too many records: {len(result['r'])}"
+    if result["r"]:
+        assert "ex" in result["r"][0], "Missing 'ex' in records"
+        assert "tot" in result["r"][0], "Missing 'tot' in records"
+    assert tokens < 200, f"Token count too high: {tokens} > 200"
+    print("[PASS]")
+    return tokens
+
+
+def test_strength_stats():
+    """Test strength_stats - should be ~60 tokens"""
+    result = get_strength_stats()
+    tokens = estimate_tokens(result)
+    print(f"\n=== strength_stats ===")
+    print(f"Result: {json.dumps(result, indent=2)}")
+    print(f"Tokens: {tokens}")
+
+    if "err" in result:
+        print("[SKIP] No strength data")
+        return tokens
+
+    assert "n" in result, "Missing 'n' field"
+    assert "tot" in result, "Missing 'tot' field"
+    assert "exs" in result, "Missing 'exs' field"
+    assert tokens < 300, f"Token count too high: {tokens} > 300"
+    print("[PASS]")
+    return tokens
+
+
+def test_strength_exercises():
+    """Test strength_exercises - list all exercises"""
+    result = get_strength_exercises()
+    tokens = estimate_tokens(result)
+    print(f"\n=== strength_exercises ===")
+    print(f"Result: {json.dumps(result, indent=2)}")
+    print(f"Tokens: {tokens}")
+
+    assert "ex" in result, "Missing 'ex' field"
+    if result["ex"]:
+        assert "name" in result["ex"][0], "Missing 'name' in exercises"
+        assert "n" in result["ex"][0], "Missing 'n' in exercises"
+    print("[PASS]")
+    return tokens
+
+
 def main():
     """Run all tests"""
     print("=" * 60)
@@ -574,7 +686,16 @@ def main():
         test_vo2max_stats,
     ]
 
-    for test_fn in weight_tests + nutrition_tests + activity_tests + rhr_tests + vo2max_tests:
+    # Strength tests
+    strength_tests = [
+        test_strength_summary,
+        test_strength_trend,
+        test_strength_records,
+        test_strength_stats,
+        test_strength_exercises,
+    ]
+
+    for test_fn in weight_tests + nutrition_tests + activity_tests + rhr_tests + vo2max_tests + strength_tests:
         try:
             test_fn()
             tests_passed += 1
