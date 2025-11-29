@@ -44,6 +44,22 @@ Sierra/
 │   │   ├── six_week.py
 │   │   ├── macrofactor.py
 │   │   └── apple_resting_hr.py
+│   ├── garmin/                 # Garmin API fetchers & shared import
+│   │   ├── __init__.py
+│   │   ├── activities.py       # GarminActivityFetcher, import_activities_to_db
+│   │   ├── weight.py           # GarminWeightFetcher, import_weight_to_db
+│   │   └── vo2max.py           # GarminVO2MaxFetcher, import_vo2max_to_db
+│   ├── mcp/                    # MCP server for LLM access
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   ├── config.py           # Centralized DB_PATH config
+│   │   ├── server.py           # FastMCP server, tool registration
+│   │   ├── weight.py           # Weight query/hide tools
+│   │   ├── nutrition.py
+│   │   ├── activity.py
+│   │   ├── resting_hr.py       # RHR query/hide tools
+│   │   ├── vo2max.py
+│   │   └── strength.py
 │   ├── transforms/
 │   │   ├── __init__.py
 │   │   ├── units.py            # kg->lbs, km->mi, pace conversions
@@ -53,6 +69,7 @@ Sierra/
 │       └── main.py             # CLI entry point
 ├── scripts/
 │   ├── test_import.py          # Test import runner
+│   ├── test_garmin.py          # Garmin API test script
 │   ├── inspect_db.py           # Query and display tables
 │   ├── show_conflicts.py       # Review import conflicts
 │   └── compare_sources.py      # Cross-source data comparison
@@ -61,6 +78,12 @@ Sierra/
 └── dashboard/                  # Streamlit dashboard
     ├── app.py
     ├── components/
+    │   ├── weight.py           # Weight tab with hide feature
+    │   ├── resting_hr.py       # RHR tab with hide feature
+    │   ├── vo2max.py
+    │   ├── garmin_import.py    # Garmin API import tab
+    │   ├── mcp.py              # MCP request monitoring
+    │   └── ...
     └── utils/
 ```
 
@@ -102,10 +125,150 @@ File → Parse → For Each Row:
 4. For each record: duplicate check at row level
 5. Update `import_log` with final counts
 
+## Garmin Import Architecture
+
+Garmin data can be imported from two sources: **CSV files** (manual export) or **Garmin Connect API** (dashboard).
+Both share the same database insert logic to ensure consistent deduplication.
+
+### Layer Design
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         UI LAYER                                │
+│  CLI (click)                    Dashboard (Streamlit)           │
+│  health_import/cli/main.py      dashboard/components/           │
+└─────────────────┬───────────────────────────┬───────────────────┘
+                  │                           │
+┌─────────────────▼───────────────────────────▼───────────────────┐
+│                       PARSER LAYER                              │
+│  CSV Parsers                    API Fetchers                    │
+│  health_import/importers/       health_import/garmin/           │
+│  - garmin_activities.py         - GarminActivityFetcher         │
+│  - garmin_weight.py             - GarminWeightFetcher           │
+│  - garmin_vo2max.py             - GarminVO2MaxFetcher           │
+└─────────────────┬───────────────────────────┬───────────────────┘
+                  │                           │
+                  │   Normalized Records      │
+                  │   (same format)           │
+                  │                           │
+┌─────────────────▼───────────────────────────▼───────────────────┐
+│                    SHARED IMPORT LAYER                          │
+│  health_import/garmin/                                          │
+│  - import_vo2max_to_db()      Dedup: (source_id, date, type)   │
+│  - import_weight_to_db()      Dedup: (source_id, date, time)   │
+│  - import_activities_to_db()  Dedup: garmin_activity_id         │
+│                               + start_time match for enrichment │
+└─────────────────────────────────────────────────────────────────┘
+                  │
+┌─────────────────▼───────────────────────────────────────────────┐
+│                      DATABASE LAYER                             │
+│  SQLite: activities, body_measurements, garmin_vo2max,          │
+│          activity_laps, activity_garmin_extras                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Shared Import Functions
+
+| Data Type | Function | Location | Dedup Key |
+|-----------|----------|----------|-----------|
+| VO2 Max | `import_vo2max_to_db()` | `garmin/vo2max.py` | `(source_id, measurement_date, activity_type)` |
+| Weight | `import_weight_to_db()` | `garmin/weight.py` | `(source_id, measurement_date, measurement_time)` |
+| Activities | `import_activities_to_db()` | `garmin/activities.py` | `garmin_activity_id` or `start_time` |
+
+### Deduplication Behavior
+
+All imports skip existing records:
+
+1. **VO2 Max / Weight**: Uses `sqlite3.IntegrityError` on UNIQUE constraint
+2. **Activities**:
+   - If `garmin_activity_id` exists → skip entirely
+   - If `start_time` matches existing activity → enrich with laps/extras (no duplicate)
+   - Otherwise → insert new activity
+
+### Activity Enrichment
+
+API imports can enrich CSV-imported activities:
+```
+CSV Import: Creates activity record (no garmin_activity_id, no laps)
+     ↓
+API Import: Finds matching start_time
+     ↓
+     Links garmin_activity_id, adds laps, adds garmin_extras
+     (no duplicate activity created)
+```
+
+### Data Flow Examples
+
+**CSV Import (CLI)**:
+```
+CSV File → GarminWeightImporter._parse_file()
+        → Normalize to {measurement_date, weight_lbs, ...}
+        → import_weight_to_db()
+        → INSERT with IntegrityError catch
+```
+
+**API Import (Dashboard)**:
+```
+Garmin API → GarminWeightFetcher.fetch_weight()
+          → convert_api_weight() (grams→lbs)
+          → import_weight_to_db()  ← same function!
+          → INSERT with IntegrityError catch
+```
+
+## MCP Server
+
+Model Context Protocol server exposes health data to LLMs with token-efficient queries.
+
+### Configuration
+Database selection in `health_import/mcp/config.py`:
+```python
+DB_PATH = DB_PATHS["prod"]  # or "test"
+```
+
+### Running
+```bash
+python -m health_import.mcp
+```
+
+### Claude Desktop Config
+```json
+{
+  "mcpServers": {
+    "sierra-health": {
+      "command": "python",
+      "args": ["-m", "health_import.mcp"],
+      "cwd": "C:/dev/python/Sierra"
+    }
+  }
+}
+```
+
+### Available Tools
+
+| Category | Tools |
+|----------|-------|
+| Weight | `weight_summary`, `weight_trend`, `weight_records`, `weight_stats`, `weight_compare`, `weight_hide`, `weight_hide_above`, `weight_hide_below`, `weight_unhide_all` |
+| Nutrition | `nutrition_summary`, `nutrition_trend`, `nutrition_day`, `nutrition_stats`, `nutrition_compare` |
+| Activity | `activity_summary`, `activity_trend`, `activity_records`, `activity_stats`, `activity_compare` |
+| Resting HR | `rhr_summary`, `rhr_trend`, `rhr_records`, `rhr_stats`, `rhr_compare`, `rhr_hide`, `rhr_hide_above`, `rhr_hide_below` |
+| VO2 Max | `vo2max_summary`, `vo2max_trend`, `vo2max_records`, `vo2max_stats`, `vo2max_compare` |
+| Strength | `strength_summary`, `strength_trend`, `strength_records`, `strength_stats`, `strength_exercises`, `strength_compare` |
+
+### Token-Efficient Keys
+Responses use abbreviated keys to minimize tokens:
+- `d`=date, `t`=time, `wt`=weight, `fat`=body_fat, `m`=muscle
+- `cur`=current/latest, `rng`=range, `s`=start, `e`=end, `n`=count
+- `avg`=mean, `med`=median, `chg`=change
+- `r`=records, `pg`=page, `pgs`=pages
+
+### Hidden Records
+Weight and RHR support hiding outliers via `*_hide`, `*_hide_above`, `*_hide_below` tools. Hidden records excluded from all queries.
+
+---
+
 ## Dependencies
 ```toml
 [project]
-dependencies = ["openpyxl>=3.1.0"]
+dependencies = ["openpyxl>=3.1.0", "garminconnect>=0.2.0", "mcp>=1.0.0"]
 ```
 All else stdlib: sqlite3, csv, logging, argparse, dataclasses, hashlib
 
@@ -300,11 +463,17 @@ CREATE TABLE activity_running_dynamics (
 ```
 
 ### activity_garmin_extras
-Garmin-specific fields not in standard schema.
+Garmin-specific fields not in standard schema. Links API data to activities.
 ```sql
 CREATE TABLE activity_garmin_extras (
     activity_id INTEGER PRIMARY KEY REFERENCES activities(id),
+    garmin_activity_id BIGINT UNIQUE, -- Garmin's activity ID (for API dedup)
+    event_type TEXT,                  -- 'race', 'training', etc.
+    location_name TEXT,               -- City/location name
     aerobic_te REAL,                  -- Aerobic Training Effect
+    anaerobic_te REAL,                -- Anaerobic Training Effect
+    training_load REAL,               -- Training load score
+    vo2max_value REAL,                -- VO2 Max from this activity
     steps INTEGER,
     body_battery_drain INTEGER,
     grit REAL,                        -- Mountain biking metric
@@ -315,6 +484,42 @@ CREATE TABLE activity_garmin_extras (
     min_respiration INTEGER,
     max_respiration INTEGER
 );
+
+CREATE INDEX idx_activity_garmin_extras_garmin_id ON activity_garmin_extras(garmin_activity_id);
+```
+
+### activity_laps
+Per-lap/split data from Garmin API.
+```sql
+CREATE TABLE activity_laps (
+    id INTEGER PRIMARY KEY,
+    activity_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+    lap_index INTEGER NOT NULL,
+    start_time TEXT,
+    distance_miles REAL,
+    duration_seconds REAL,
+    moving_duration_seconds REAL,
+    avg_speed_mph REAL,
+    max_speed_mph REAL,
+    avg_pace_min_per_mile REAL,
+    avg_hr INTEGER,
+    max_hr INTEGER,
+    avg_cadence INTEGER,
+    max_cadence INTEGER,
+    avg_power_watts INTEGER,
+    max_power_watts INTEGER,
+    normalized_power_watts INTEGER,
+    calories INTEGER,
+    elevation_gain_ft REAL,
+    elevation_loss_ft REAL,
+    avg_stride_length_ft REAL,
+    avg_vertical_oscillation_in REAL,
+    avg_ground_contact_time_ms INTEGER,
+    avg_vertical_ratio REAL,
+    UNIQUE(activity_id, lap_index)
+);
+
+CREATE INDEX idx_activity_laps_activity ON activity_laps(activity_id);
 ```
 
 ---
@@ -351,6 +556,7 @@ CREATE TABLE body_measurements (
     -- Metadata
     import_id INTEGER REFERENCES import_log(id),
     created_at TEXT DEFAULT (datetime('now')),
+    hidden INTEGER DEFAULT 0,         -- 1=excluded from queries
 
     UNIQUE(source_id, measurement_date, measurement_time)
 );
@@ -385,6 +591,7 @@ CREATE TABLE resting_heart_rate (
     measurement_date TEXT NOT NULL,   -- 'YYYY-MM-DD'
     resting_hr INTEGER NOT NULL,      -- bpm
     source_name TEXT,                 -- 'Apple Watch', etc.
+    hidden INTEGER DEFAULT 0,         -- 1=excluded from queries
     import_id INTEGER REFERENCES import_log(id),
     created_at TEXT DEFAULT (datetime('now')),
 
@@ -706,4 +913,25 @@ SELECT ds.name as source, COUNT(*) as activities,
 FROM activities a
 JOIN data_sources ds ON a.source_id = ds.id
 GROUP BY ds.name;
+```
+
+---
+
+## MCP Monitoring
+
+### mcp_requests
+Logs MCP tool calls for dashboard monitoring.
+```sql
+CREATE TABLE mcp_requests (
+    id INTEGER PRIMARY KEY,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    tool_name TEXT NOT NULL,
+    params TEXT,                      -- JSON of request params
+    response TEXT,                    -- JSON response (truncated if large)
+    response_tokens INTEGER,          -- Estimated token count
+    duration_ms INTEGER
+);
+
+CREATE INDEX idx_mcp_requests_timestamp ON mcp_requests(timestamp);
+CREATE INDEX idx_mcp_requests_tool ON mcp_requests(tool_name);
 ```

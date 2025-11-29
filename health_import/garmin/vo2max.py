@@ -136,6 +136,11 @@ def import_vo2max_to_db(
     """
     Import VO2 Max readings to database.
 
+    Shared by both CSV and API importers.
+
+    Expected record format:
+        {date: str, vo2max: float, activity_type: str}
+
     Returns:
         {processed: int, inserted: int, skipped: int}
     """
@@ -145,11 +150,21 @@ def import_vo2max_to_db(
 
     for reading in readings:
         processed += 1
+
+        # Normalize field names (API uses 'date', CSV might use 'measurement_date')
+        measurement_date = reading.get('date') or reading.get('measurement_date')
+        vo2max_value = reading.get('vo2max') or reading.get('vo2max_value')
+        activity_type = reading.get('activity_type')
+
+        if not measurement_date or not vo2max_value:
+            skipped += 1
+            continue
+
         try:
             conn.execute(
                 """INSERT INTO garmin_vo2max (source_id, measurement_date, activity_type, vo2max_value)
                    VALUES (?, ?, ?, ?)""",
-                (source_id, reading['date'], reading['activity_type'], reading['vo2max'])
+                (source_id, measurement_date, activity_type, vo2max_value)
             )
             inserted += 1
         except sqlite3.IntegrityError:

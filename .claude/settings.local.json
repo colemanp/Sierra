@@ -4,7 +4,14 @@
       "Bash(cat:*)",
       "Bash(C:/dev/python/Sierra/.venv/Scripts/python.exe:*)",
       "Bash(C:/dev/python/Sierra/.venv/Scripts/pip.exe install:*)",
-      "Bash(C:/dev/python/Sierra/.venv/Scripts/pip.exe list:*)"
+      "Bash(C:/dev/python/Sierra/.venv/Scripts/pip.exe list:*)",
+      "Bash(dir:*)",
+      "Bash(echo:*)",
+      "Bash(C:/dev/python/Sierra/.venv/Scripts/pip.exe:*)",
+      "Bash(timeout 3 C:/dev/python/Sierra/.venv/Scripts/python.exe:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

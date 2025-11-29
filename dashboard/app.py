@@ -20,6 +20,7 @@ from dashboard.components.imports import render_imports
 from dashboard.components.mcp import render_mcp
 from dashboard.components.resting_hr import render_resting_hr
 from dashboard.components.vo2max import render_vo2max
+from dashboard.components.garmin_import import render_garmin_import
 
 
 def main():
@@ -43,7 +44,7 @@ def main():
         return
 
     # Main content tabs
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
         "Overview",
         "Activities",
         "Body",
@@ -52,6 +53,7 @@ def main():
         "VO2 Max",
         "Strength",
         "Nutrition",
+        "Garmin Import",
         "Imports",
         "MCP"
     ])
@@ -81,9 +83,12 @@ def main():
         render_nutrition(conn)
 
     with tab9:
-        render_imports(conn)
+        render_garmin_import(conn)
 
     with tab10:
+        render_imports(conn)
+
+    with tab11:
         render_mcp(conn)
 
     # Close connection

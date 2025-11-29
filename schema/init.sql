@@ -96,7 +96,13 @@ CREATE TABLE IF NOT EXISTS activity_running_dynamics (
 
 CREATE TABLE IF NOT EXISTS activity_garmin_extras (
     activity_id INTEGER PRIMARY KEY REFERENCES activities(id),
+    garmin_activity_id BIGINT UNIQUE,
+    event_type TEXT,
+    location_name TEXT,
     aerobic_te REAL,
+    anaerobic_te REAL,
+    training_load REAL,
+    vo2max_value REAL,
     steps INTEGER,
     body_battery_drain INTEGER,
     grit REAL,
@@ -106,6 +112,34 @@ CREATE TABLE IF NOT EXISTS activity_garmin_extras (
     avg_respiration INTEGER,
     min_respiration INTEGER,
     max_respiration INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS activity_laps (
+    id INTEGER PRIMARY KEY,
+    activity_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+    lap_index INTEGER NOT NULL,
+    start_time TEXT,
+    distance_miles REAL,
+    duration_seconds REAL,
+    moving_duration_seconds REAL,
+    avg_speed_mph REAL,
+    max_speed_mph REAL,
+    avg_pace_min_per_mile REAL,
+    avg_hr INTEGER,
+    max_hr INTEGER,
+    avg_cadence INTEGER,
+    max_cadence INTEGER,
+    avg_power_watts INTEGER,
+    max_power_watts INTEGER,
+    normalized_power_watts INTEGER,
+    calories INTEGER,
+    elevation_gain_ft REAL,
+    elevation_loss_ft REAL,
+    avg_stride_length_ft REAL,
+    avg_vertical_oscillation_in REAL,
+    avg_ground_contact_time_ms INTEGER,
+    avg_vertical_ratio REAL,
+    UNIQUE(activity_id, lap_index)
 );
 
 -- ============================================
@@ -129,6 +163,7 @@ CREATE TABLE IF NOT EXISTS body_measurements (
     basal_metabolic_rate_kcal REAL,
     import_id INTEGER REFERENCES import_log(id),
     created_at TEXT DEFAULT (datetime('now')),
+    hidden INTEGER DEFAULT 0,
     UNIQUE(source_id, measurement_date, measurement_time)
 );
 
@@ -348,6 +383,8 @@ CREATE INDEX IF NOT EXISTS idx_mcp_requests_tool ON mcp_requests(tool_name);
 
 CREATE INDEX IF NOT EXISTS idx_activities_date ON activities(start_time);
 CREATE INDEX IF NOT EXISTS idx_activities_type ON activities(activity_type_id);
+CREATE INDEX IF NOT EXISTS idx_activity_laps_activity ON activity_laps(activity_id);
+CREATE INDEX IF NOT EXISTS idx_activity_garmin_extras_garmin_id ON activity_garmin_extras(garmin_activity_id);
 CREATE INDEX IF NOT EXISTS idx_body_measurements_date ON body_measurements(measurement_date);
 CREATE INDEX IF NOT EXISTS idx_garmin_vo2max_date ON garmin_vo2max(measurement_date);
 CREATE INDEX IF NOT EXISTS idx_resting_hr_date ON resting_heart_rate(measurement_date);
@@ -366,6 +403,7 @@ INSERT OR IGNORE INTO data_sources (name, description, file_pattern) VALUES
     ('garmin_activities', 'Garmin Connect activity exports', '*.csv'),
     ('garmin_weight', 'Garmin Connect weight/body composition', '*.csv'),
     ('garmin_vo2max', 'Garmin VO2 Max tracking CSV', '*.csv'),
+    ('garmin_api', 'Garmin Connect API imports', NULL),
     ('six_week', 'Just 6 Weeks strength training app', '*.csv'),
     ('macrofactor', 'MacroFactor nutrition tracking', '*.xlsx'),
     ('apple_healthkit', 'Apple Health export', 'export.xml');

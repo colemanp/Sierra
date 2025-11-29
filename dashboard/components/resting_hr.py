@@ -149,7 +149,7 @@ def render_resting_hr(conn):
         yaxis_title="Resting HR (bpm)",
         legend=dict(orientation="h", yanchor="bottom", y=1.02)
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     # Monthly averages
     st.subheader("Monthly Averages")
@@ -183,7 +183,7 @@ def render_resting_hr(conn):
             yaxis_title="Resting HR (bpm)",
             legend=dict(orientation="h", yanchor="bottom", y=1.02)
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     st.divider()
 
@@ -191,11 +191,11 @@ def render_resting_hr(conn):
     st.subheader("Recent Records")
     recent_df = df_visible.tail(30).iloc[::-1][["date", "hr", "source_name"]].copy()
     recent_df.columns = ["Date", "Resting HR (bpm)", "Source"]
-    st.dataframe(recent_df, use_container_width=True, hide_index=True)
+    st.dataframe(recent_df, width="stretch", hide_index=True)
 
     # Hidden records table (if any)
     if not df_hidden.empty:
         with st.expander(f"Hidden Records ({len(df_hidden)})"):
             hidden_df = df_hidden.iloc[::-1][["date", "hr", "source_name"]].copy()
             hidden_df.columns = ["Date", "Resting HR (bpm)", "Source"]
-            st.dataframe(hidden_df, use_container_width=True, hide_index=True)
+            st.dataframe(hidden_df, width="stretch", hide_index=True)

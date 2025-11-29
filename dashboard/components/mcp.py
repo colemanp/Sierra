@@ -103,7 +103,7 @@ def render_mcp(conn):
                 "Avg ms": f"{row[6]:.0f}" if row[6] else "-",
                 "Last Used": last_used,
             })
-        st.dataframe(pd.DataFrame(tool_data), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(tool_data), width="stretch", hide_index=True)
 
         st.divider()
 
@@ -131,7 +131,7 @@ def render_mcp(conn):
     # Show table with row selection
     selection = st.dataframe(
         history_df,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         selection_mode="single-row",
         on_select="rerun",

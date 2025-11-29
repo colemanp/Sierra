@@ -111,11 +111,35 @@ def test_weight(client: Garmin):
         if weights and 'dailyWeightSummaries' in weights:
             for w in weights['dailyWeightSummaries']:
                 d = w.get('summaryDate', '?')
-                wt = w.get('weight', 0) / 1000  # grams to kg
+                latest = w.get('latestWeight', {})
+                wt = latest.get('weight', 0) / 1000  # grams to kg
                 wt_lbs = wt * 2.20462
                 print(f"{d}: {wt_lbs:.1f} lbs")
         else:
             print("No weight data")
+    except Exception as e:
+        print(f"Error: {e}")
+
+
+def test_weight_historical(client: Garmin):
+    """Test historical weight data from March 2010"""
+    print("\n=== Weight (March 2010 - Historical) ===")
+    start = date(2010, 3, 1)
+    end = date(2010, 3, 31)
+    try:
+        weights = client.get_weigh_ins(start.isoformat(), end.isoformat())
+        print(f"Raw API response keys: {list(weights.keys()) if weights else 'None'}")
+
+        if weights and 'dailyWeightSummaries' in weights:
+            summaries = weights['dailyWeightSummaries']
+            print(f"Found {len(summaries)} daily summaries")
+
+            for w in summaries[:5]:  # First 5 entries
+                print(f"\n--- {w.get('summaryDate', '?')} ---")
+                print(json.dumps(w, indent=2, default=str))
+        else:
+            print("No weight data for March 2010")
+            print(f"Full response: {json.dumps(weights, indent=2, default=str)}")
     except Exception as e:
         print(f"Error: {e}")
 
@@ -179,6 +203,110 @@ def test_vo2max(client: Garmin):
         print(f"Error: {e}")
 
 
+def test_activity_details(client: Garmin):
+    """Test fetching activity details from yesterday"""
+    print("\n=== Activity Details (Yesterday) ===")
+    yesterday = date.today() - timedelta(days=1)
+    try:
+        # Get activities from yesterday
+        activities = client.get_activities_by_date(
+            yesterday.isoformat(), yesterday.isoformat()
+        )
+        if not activities:
+            print("No activities found yesterday")
+            return
+
+        # Get first activity's details
+        activity = activities[0]
+        activity_id = activity.get('activityId')
+        print(f"Activity: {activity.get('activityName')} (ID: {activity_id})")
+        print(f"Type: {activity.get('activityType', {}).get('typeKey')}")
+
+        # Basic stats from list response
+        print(f"\n--- Basic Stats ---")
+        print(f"Distance: {activity.get('distance', 0)/1609.34:.2f} mi")
+        print(f"Duration: {activity.get('duration', 0)/60:.1f} min")
+        print(f"Avg HR: {activity.get('averageHR')}")
+        print(f"Max HR: {activity.get('maxHR')}")
+        print(f"Calories: {activity.get('calories')}")
+        print(f"Avg Pace: {activity.get('averageSpeed')}")
+
+        # Get full activity details - dump everything
+        print(f"\n--- Full Activity Details ---")
+        details = client.get_activity(activity_id)
+        print(json.dumps(details, indent=2, default=str))
+
+        # Save to file for analysis
+        output_dir = Path(__file__).parent.parent / "data" / "garmin_samples"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_file = output_dir / f"activity_{activity_id}.json"
+
+        all_data = {
+            "activity_list": activity,
+            "activity_details": details,
+        }
+
+        # Add splits
+        try:
+            all_data["splits"] = client.get_activity_splits(activity_id)
+        except:
+            pass
+
+        # Add HR zones
+        try:
+            all_data["hr_zones"] = client.get_activity_hr_in_timezones(activity_id)
+        except:
+            pass
+
+        # Add time series
+        try:
+            all_data["time_series"] = client.get_activity_details(activity_id)
+        except:
+            pass
+
+        with open(output_file, "w") as f:
+            json.dump(all_data, f, indent=2, default=str)
+        print(f"\n*** Saved full activity data to: {output_file} ***")
+
+        # Get splits/laps - full dump
+        print(f"\n--- Splits (Full Data) ---")
+        try:
+            splits = client.get_activity_splits(activity_id)
+            print(f"Splits keys: {list(splits.keys()) if splits else 'None'}")
+            if splits:
+                print(json.dumps(splits, indent=2, default=str))
+        except Exception as e:
+            print(f"  Error getting splits: {e}")
+
+        # Get HR zones - full dump
+        print(f"\n--- HR Zones (Full Data) ---")
+        try:
+            hr_zones = client.get_activity_hr_in_timezones(activity_id)
+            print(json.dumps(hr_zones, indent=2, default=str))
+        except Exception as e:
+            print(f"  Error getting HR zones: {e}")
+
+        # Try get_activity_details for GPS/HR time series
+        print(f"\n--- Activity Details (Time Series) ---")
+        try:
+            activity_details = client.get_activity_details(activity_id)
+            print(f"Keys: {list(activity_details.keys()) if activity_details else 'None'}")
+            # This can be huge, just show structure
+            if activity_details:
+                for k, v in activity_details.items():
+                    if isinstance(v, list):
+                        print(f"  {k}: list of {len(v)} items")
+                        if v:
+                            print(f"    Sample: {json.dumps(v[0], indent=4, default=str)[:500]}")
+                    else:
+                        print(f"  {k}: {type(v).__name__}")
+        except Exception as e:
+            print(f"  Error getting activity details: {e}")
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+
 def test_vo2max_history_bulk(client: Garmin):
     """Test VO2 Max history using bulk endpoint (single API call)"""
     print("\n=== VO2 Max History - Bulk Endpoint (Last 90 Days) ===")
@@ -234,10 +362,12 @@ def main():
     test_resting_hr_history(client)
     test_activities(client)
     test_weight(client)
+    test_weight_historical(client)
     test_sleep(client)
     test_steps(client)
     test_vo2max(client)
     test_vo2max_history_bulk(client)
+    test_activity_details(client)
 
     print("\n" + "=" * 40)
     print("Tests complete!")

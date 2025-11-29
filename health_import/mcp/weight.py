@@ -6,20 +6,14 @@ Token-efficient keys:
   r=records, pg=page, pgs=pages
   avg=mean, med=median, chg=change
   per=period, p1/p2=period1/period2
+  hidden=excluded from queries
 """
 import sqlite3
-from pathlib import Path
 from datetime import datetime
 from typing import Optional
 import statistics
 
-# Database paths
-DB_PATHS = {
-    "prod": Path(__file__).parent.parent.parent / "data" / "prod" / "health_data.db",
-    "test": Path(__file__).parent.parent.parent / "data" / "test" / "health_data.db",
-}
-# Default to test DB (prod is empty currently)
-DB_PATH = DB_PATHS["test"]
+from health_import.mcp.config import DB_PATH
 
 
 def _get_conn() -> sqlite3.Connection:
@@ -41,6 +35,7 @@ def get_weight_summary() -> dict:
         cur = conn.execute("""
             SELECT measurement_date, weight_lbs, body_fat_pct, muscle_mass_lbs
             FROM body_measurements
+            WHERE hidden = 0 OR hidden IS NULL
             ORDER BY measurement_date DESC, measurement_time DESC
             LIMIT 1
         """).fetchone()
@@ -50,6 +45,7 @@ def get_weight_summary() -> dict:
                    MAX(measurement_date) as e,
                    COUNT(*) as n
             FROM body_measurements
+            WHERE hidden = 0 OR hidden IS NULL
         """).fetchone()
 
         if not cur:
@@ -93,6 +89,7 @@ def get_weight_trend(period: str = "month", limit: int = 12) -> dict:
                     AVG(body_fat_pct) as fat,
                     AVG(muscle_mass_lbs) as m
                 FROM body_measurements
+                WHERE hidden = 0 OR hidden IS NULL
                 GROUP BY p
                 ORDER BY p DESC
                 LIMIT ?
@@ -108,6 +105,7 @@ def get_weight_trend(period: str = "month", limit: int = 12) -> dict:
                     AVG(body_fat_pct) as fat,
                     AVG(muscle_mass_lbs) as m
                 FROM body_measurements
+                WHERE hidden = 0 OR hidden IS NULL
                 GROUP BY p
                 ORDER BY p DESC
                 LIMIT ?
@@ -140,7 +138,7 @@ def get_weight_records(
     """Get paginated raw weight records"""
     conn = _get_conn()
     try:
-        conditions = []
+        conditions = ["(hidden = 0 OR hidden IS NULL)"]
         params = []
         if start_date:
             conditions.append("measurement_date >= ?")
@@ -149,7 +147,7 @@ def get_weight_records(
             conditions.append("measurement_date <= ?")
             params.append(end_date)
 
-        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        where = f"WHERE {' AND '.join(conditions)}"
 
         count = conn.execute(
             f"SELECT COUNT(*) FROM body_measurements {where}", params
@@ -198,7 +196,7 @@ def get_weight_stats(
     """Get statistical summary of weight data"""
     conn = _get_conn()
     try:
-        conditions = []
+        conditions = ["(hidden = 0 OR hidden IS NULL)"]
         params = []
         if start_date:
             conditions.append("measurement_date >= ?")
@@ -207,7 +205,7 @@ def get_weight_stats(
             conditions.append("measurement_date <= ?")
             params.append(end_date)
 
-        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        where = f"WHERE {' AND '.join(conditions)}"
 
         query = f"""
             SELECT weight_lbs, body_fat_pct, measurement_date
@@ -282,7 +280,8 @@ def get_weight_compare(
                        MIN(weight_lbs) as min_wt, MAX(weight_lbs) as max_wt,
                        COUNT(*) as n
                 FROM body_measurements
-                WHERE measurement_date >= ? AND measurement_date <= ?
+                WHERE (hidden = 0 OR hidden IS NULL)
+                  AND measurement_date >= ? AND measurement_date <= ?
             """,
                 (start, end),
             ).fetchone()
@@ -309,5 +308,120 @@ def get_weight_compare(
             "p2": {"rng": f"{period2_start}/{period2_end}", **p2},
             "d": delta,
         }
+    finally:
+        conn.close()
+
+
+def hide_weight_record(date: str, hidden: bool = True) -> dict:
+    """Hide or unhide a weight record by date"""
+    conn = _get_conn()
+    try:
+        row = conn.execute("""
+            SELECT id, weight_lbs, hidden
+            FROM body_measurements
+            WHERE measurement_date = ?
+        """, (date,)).fetchone()
+
+        if not row:
+            return {"err": f"No weight record found for {date}"}
+
+        hidden_val = 1 if hidden else 0
+        conn.execute("""
+            UPDATE body_measurements
+            SET hidden = ?
+            WHERE measurement_date = ?
+        """, (hidden_val, date))
+        conn.commit()
+
+        action = "hidden" if hidden else "unhidden"
+        return {
+            "ok": True,
+            "d": date,
+            "wt": _round1(row["weight_lbs"]),
+            "action": action,
+        }
+    finally:
+        conn.close()
+
+
+def hide_weight_above(weight_lbs: float) -> dict:
+    """Hide all weight records above a threshold"""
+    conn = _get_conn()
+    try:
+        rows = conn.execute("""
+            SELECT measurement_date, weight_lbs
+            FROM body_measurements
+            WHERE weight_lbs > ? AND (hidden = 0 OR hidden IS NULL)
+            ORDER BY weight_lbs DESC
+        """, (weight_lbs,)).fetchall()
+
+        if not rows:
+            return {"ok": True, "n": 0, "msg": f"No visible records above {weight_lbs} lbs"}
+
+        conn.execute("""
+            UPDATE body_measurements
+            SET hidden = 1
+            WHERE weight_lbs > ? AND (hidden = 0 OR hidden IS NULL)
+        """, (weight_lbs,))
+        conn.commit()
+
+        hidden_wts = [r["weight_lbs"] for r in rows]
+        return {
+            "ok": True,
+            "n": len(rows),
+            "threshold": weight_lbs,
+            "range": {"min": _round1(min(hidden_wts)), "max": _round1(max(hidden_wts))},
+        }
+    finally:
+        conn.close()
+
+
+def hide_weight_below(weight_lbs: float) -> dict:
+    """Hide all weight records below a threshold"""
+    conn = _get_conn()
+    try:
+        rows = conn.execute("""
+            SELECT measurement_date, weight_lbs
+            FROM body_measurements
+            WHERE weight_lbs < ? AND (hidden = 0 OR hidden IS NULL)
+            ORDER BY weight_lbs ASC
+        """, (weight_lbs,)).fetchall()
+
+        if not rows:
+            return {"ok": True, "n": 0, "msg": f"No visible records below {weight_lbs} lbs"}
+
+        conn.execute("""
+            UPDATE body_measurements
+            SET hidden = 1
+            WHERE weight_lbs < ? AND (hidden = 0 OR hidden IS NULL)
+        """, (weight_lbs,))
+        conn.commit()
+
+        hidden_wts = [r["weight_lbs"] for r in rows]
+        return {
+            "ok": True,
+            "n": len(rows),
+            "threshold": weight_lbs,
+            "range": {"min": _round1(min(hidden_wts)), "max": _round1(max(hidden_wts))},
+        }
+    finally:
+        conn.close()
+
+
+def unhide_all_weight() -> dict:
+    """Unhide all hidden weight records"""
+    conn = _get_conn()
+    try:
+        count = conn.execute("""
+            SELECT COUNT(*) FROM body_measurements WHERE hidden = 1
+        """).fetchone()[0]
+
+        if count == 0:
+            return {"ok": True, "n": 0, "msg": "No hidden records"}
+
+        conn.execute("UPDATE body_measurements SET hidden = 0 WHERE hidden = 1")
+        conn.commit()
+
+        return {"ok": True, "n": count}
     finally:
         conn.close()

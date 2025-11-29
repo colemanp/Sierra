@@ -25,13 +25,17 @@ from pathlib import Path
 from datetime import datetime
 from mcp.server import FastMCP
 
+from health_import.mcp.config import DB_PATH
 from health_import.mcp.weight import (
     get_weight_summary,
     get_weight_trend,
     get_weight_records,
     get_weight_stats,
     get_weight_compare,
-    DB_PATH,
+    hide_weight_record,
+    hide_weight_above,
+    hide_weight_below,
+    unhide_all_weight,
 )
 from health_import.mcp.nutrition import (
     get_nutrition_summary,
@@ -142,10 +146,10 @@ mcp = FastMCP(
     name="sierra-health",
     instructions=(
         "Health metrics tool for weight, nutrition, activity, resting heart rate, VO2 Max, and strength data. "
-        "Weight tools: weight_summary, weight_trend, weight_records, weight_stats, weight_compare. "
+        "Weight tools: weight_summary, weight_trend, weight_records, weight_stats, weight_compare, weight_hide, weight_hide_above, weight_hide_below, weight_unhide_all. "
         "Nutrition tools: nutrition_summary, nutrition_trend, nutrition_day, nutrition_stats, nutrition_compare. "
         "Activity tools: activity_summary, activity_trend, activity_records, activity_stats, activity_compare. "
-        "Resting HR tools: rhr_summary, rhr_trend, rhr_records, rhr_stats, rhr_compare, rhr_hide, rhr_hide_above, rhr_hide_below."
+        "Resting HR tools: rhr_summary, rhr_trend, rhr_records, rhr_stats, rhr_compare, rhr_hide, rhr_hide_above, rhr_hide_below. "
         "VO2 Max tools: vo2max_summary, vo2max_trend, vo2max_records, vo2max_stats, vo2max_compare. "
         "Strength tools: strength_summary, strength_trend, strength_records, strength_stats, strength_exercises, strength_compare."
     ),
@@ -329,6 +333,119 @@ async def weight_compare(
         return result
     except Exception as e:
         logger.error(f"weight_compare error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def weight_hide(date: str, hidden: bool = True) -> dict:
+    """
+    Hide or unhide a weight record.
+
+    Args:
+        date: Date of the record to hide (YYYY-MM-DD)
+        hidden: True to hide, False to unhide (default True)
+
+    Hidden records are excluded from all weight queries.
+    Returns confirmation with date, weight value, and action taken.
+    """
+    logger.info(f"MCP Tool Call: weight_hide(date={date}, hidden={hidden})")
+    start = time.time()
+    try:
+        result = hide_weight_record(date, hidden)
+        tokens = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"weight_hide: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "weight_hide",
+            {"date": date, "hidden": hidden},
+            result,
+            duration_ms,
+            tokens,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"weight_hide error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def weight_hide_above(weight_lbs: float) -> dict:
+    """
+    Hide all weight records above a threshold.
+
+    Args:
+        weight_lbs: Weight threshold in lbs (records > weight_lbs will be hidden)
+
+    Useful for removing outliers. Returns count of hidden records.
+    """
+    logger.info(f"MCP Tool Call: weight_hide_above(weight_lbs={weight_lbs})")
+    start = time.time()
+    try:
+        result = hide_weight_above(weight_lbs)
+        tokens = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"weight_hide_above: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "weight_hide_above",
+            {"weight_lbs": weight_lbs},
+            result,
+            duration_ms,
+            tokens,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"weight_hide_above error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def weight_hide_below(weight_lbs: float) -> dict:
+    """
+    Hide all weight records below a threshold.
+
+    Args:
+        weight_lbs: Weight threshold in lbs (records < weight_lbs will be hidden)
+
+    Useful for removing outliers. Returns count of hidden records.
+    """
+    logger.info(f"MCP Tool Call: weight_hide_below(weight_lbs={weight_lbs})")
+    start = time.time()
+    try:
+        result = hide_weight_below(weight_lbs)
+        tokens = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"weight_hide_below: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "weight_hide_below",
+            {"weight_lbs": weight_lbs},
+            result,
+            duration_ms,
+            tokens,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"weight_hide_below error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def weight_unhide_all() -> dict:
+    """
+    Unhide all hidden weight records.
+
+    Returns count of records that were unhidden.
+    """
+    logger.info("MCP Tool Call: weight_unhide_all()")
+    start = time.time()
+    try:
+        result = unhide_all_weight()
+        tokens = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"weight_unhide_all: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request("weight_unhide_all", {}, result, duration_ms, tokens)
+        return result
+    except Exception as e:
+        logger.error(f"weight_unhide_all error: {e}", exc_info=True)
         return {"error": str(e)}
 
 

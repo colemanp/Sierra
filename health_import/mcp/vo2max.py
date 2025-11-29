@@ -6,17 +6,10 @@ Token-efficient keys:
   avg=average, min=minimum, max=maximum, std=std deviation
 """
 import sqlite3
-from pathlib import Path
 from typing import Optional
 import statistics
 
-# Database paths
-DB_PATHS = {
-    "prod": Path(__file__).parent.parent.parent / "data" / "prod" / "health_data.db",
-    "test": Path(__file__).parent.parent.parent / "data" / "test" / "health_data.db",
-}
-# Default to test DB
-DB_PATH = DB_PATHS["test"]
+from health_import.mcp.config import DB_PATH
 
 
 def _get_conn() -> sqlite3.Connection:

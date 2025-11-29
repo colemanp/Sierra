@@ -1,10 +1,10 @@
 """Garmin weight/body composition CSV importer"""
-import csv
 from pathlib import Path
 from typing import Any, Dict, Iterator, Optional
 
 from .base import BaseImporter
 from ..transforms.datetime_utils import parse_garmin_date, parse_time_12h
+from ..garmin.weight import import_weight_to_db
 
 
 class GarminWeightImporter(BaseImporter):
@@ -62,43 +62,45 @@ class GarminWeightImporter(BaseImporter):
                     "body_water": parts[7].strip() if len(parts) > 7 else None,
                 }
 
-    def _process_record(self, record: Dict[str, Any]) -> str:
-        """Process a single weight record"""
-        # Parse date
-        date_iso = parse_garmin_date(record.get("date"))
-        if not date_iso:
-            self.logger.warning(f"Skipping record with invalid date: {record.get('date')}")
-            return "skipped"
+    def import_file(self, file_path: Path) -> Dict[str, int]:
+        """Import file using shared import logic"""
+        self.logger.info(f"Importing {file_path}")
 
-        # Parse time
-        time_24h = parse_time_12h(record.get("time"))
+        # Parse CSV to normalized records
+        records = []
+        for raw_record in self._parse_file(file_path):
+            date_iso = parse_garmin_date(raw_record.get("date"))
+            if not date_iso:
+                continue
 
-        # Build measurement data
-        data = {
-            "source_id": self.source_id,
-            "measurement_date": date_iso,
-            "measurement_time": time_24h,
-            "weight_lbs": self._parse_weight(record.get("weight")),
-            "weight_change_lbs": self._parse_weight(record.get("change")),
-            "bmi": self._parse_float(record.get("bmi")),
-            "body_fat_pct": self._parse_percent(record.get("body_fat")),
-            "muscle_mass_lbs": self._parse_weight(record.get("muscle_mass")),
-            "bone_mass_lbs": self._parse_weight(record.get("bone_mass")),
-            "body_water_pct": self._parse_percent(record.get("body_water")),
-        }
+            weight_lbs = self._parse_weight(raw_record.get("weight"))
+            if not weight_lbs:
+                continue
 
-        # Key fields for conflict detection
-        key_fields = {
-            "source_id": self.source_id,
-            "measurement_date": date_iso,
-            "measurement_time": time_24h,
-        }
+            records.append({
+                "measurement_date": date_iso,
+                "measurement_time": parse_time_12h(raw_record.get("time")),
+                "weight_lbs": weight_lbs,
+                "weight_change_lbs": self._parse_weight(raw_record.get("change")),
+                "bmi": self._parse_float(raw_record.get("bmi")),
+                "body_fat_pct": self._parse_percent(raw_record.get("body_fat")),
+                "muscle_mass_lbs": self._parse_weight(raw_record.get("muscle_mass")),
+                "bone_mass_lbs": self._parse_weight(raw_record.get("bone_mass")),
+                "body_water_pct": self._parse_percent(raw_record.get("body_water")),
+            })
 
-        return self._insert_with_conflict_check(
-            "body_measurements",
-            key_fields,
-            data
+        # Use shared import function
+        result = import_weight_to_db(self.db.conn, records, self.source_id)
+
+        self.logger.info(
+            f"Completed: {result['processed']} processed, "
+            f"{result['inserted']} inserted, {result['skipped']} skipped"
         )
+        return result
+
+    def _process_record(self, record: Dict[str, Any]) -> str:
+        """Not used - import_file overrides base class"""
+        raise NotImplementedError("Use import_file instead")
 
     def _parse_float(self, value: Optional[str]) -> Optional[float]:
         """Parse float, handling empty strings"""
@@ -130,14 +132,3 @@ class GarminWeightImporter(BaseImporter):
             return float(clean)
         except ValueError:
             return None
-
-    def _log_insert(self, record: Dict[str, Any]) -> None:
-        """Log insert with weight details"""
-        date = record.get("date", "")
-        weight = record.get("weight", "")
-        self.logger.info(f"Inserted: {date} - {weight}")
-
-    def _log_skip(self, record: Dict[str, Any]) -> None:
-        """Log skip with date"""
-        date = record.get("date", "")
-        self.logger.debug(f"Skipped: {date} (already exists)")

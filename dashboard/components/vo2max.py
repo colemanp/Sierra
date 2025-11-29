@@ -77,7 +77,7 @@ def render_vo2max(conn):
                 tooltip=['Date:T', alt.Tooltip('VO2 Max:Q', format='.1f')]
             ).properties(height=250)
 
-            st.altair_chart(chart, use_container_width=True)
+            st.altair_chart(chart, width="stretch")
     else:
         st.info("No VO2 Max data in database yet")
 
@@ -122,7 +122,7 @@ def render_vo2max(conn):
         if readings:
             preview_df = pd.DataFrame(readings)
             preview_df.columns = ['Date', 'VO2 Max', 'Type']
-            st.dataframe(preview_df, hide_index=True, use_container_width=True)
+            st.dataframe(preview_df, hide_index=True, width="stretch")
 
             # Import button
             col1, col2 = st.columns([1, 4])

@@ -1,10 +1,10 @@
 """Garmin VO2 Max CSV importer"""
-import csv
 from pathlib import Path
 from typing import Any, Dict, Iterator, Optional
 
 from .base import BaseImporter
 from ..transforms.datetime_utils import parse_garmin_date
+from ..garmin.vo2max import import_vo2max_to_db
 
 
 class GarminVO2MaxImporter(BaseImporter):
@@ -36,42 +36,37 @@ class GarminVO2MaxImporter(BaseImporter):
                     "vo2max": parts[2].strip(),
                 }
 
-    def _process_record(self, record: Dict[str, Any]) -> str:
-        """Process a single VO2 Max record"""
-        # Parse date
-        date_iso = parse_garmin_date(record.get("date"))
-        if not date_iso:
-            self.logger.warning(f"Skipping record with invalid date: {record.get('date')}")
-            return "skipped"
+    def import_file(self, file_path: Path) -> Dict[str, int]:
+        """Import file using shared import logic"""
+        self.logger.info(f"Importing {file_path}")
 
-        # Parse VO2 Max value
-        vo2max = self._parse_float(record.get("vo2max"))
-        if vo2max is None:
-            self.logger.warning(f"Skipping record with invalid VO2 Max: {record.get('vo2max')}")
-            return "skipped"
+        # Parse CSV to normalized records
+        records = []
+        for raw_record in self._parse_file(file_path):
+            date_iso = parse_garmin_date(raw_record.get("date"))
+            vo2max = self._parse_float(raw_record.get("vo2max"))
 
-        activity_type = record.get("activity_type", "").strip() or None
+            if not date_iso or vo2max is None:
+                continue
 
-        # Build data
-        data = {
-            "source_id": self.source_id,
-            "measurement_date": date_iso,
-            "activity_type": activity_type,
-            "vo2max_value": vo2max,
-        }
+            records.append({
+                "date": date_iso,
+                "activity_type": raw_record.get("activity_type", "").strip() or None,
+                "vo2max": vo2max,
+            })
 
-        # Key fields for conflict detection
-        key_fields = {
-            "source_id": self.source_id,
-            "measurement_date": date_iso,
-            "activity_type": activity_type,
-        }
+        # Use shared import function
+        result = import_vo2max_to_db(self.db.conn, records, self.source_id)
 
-        return self._insert_with_conflict_check(
-            "garmin_vo2max",
-            key_fields,
-            data
+        self.logger.info(
+            f"Completed: {result['processed']} processed, "
+            f"{result['inserted']} inserted, {result['skipped']} skipped"
         )
+        return result
+
+    def _process_record(self, record: Dict[str, Any]) -> str:
+        """Not used - import_file overrides base class"""
+        raise NotImplementedError("Use import_file instead")
 
     def _parse_float(self, value: Optional[str]) -> Optional[float]:
         """Parse float value"""
@@ -81,15 +76,3 @@ class GarminVO2MaxImporter(BaseImporter):
             return float(value.strip())
         except ValueError:
             return None
-
-    def _log_insert(self, record: Dict[str, Any]) -> None:
-        """Log insert with VO2 Max details"""
-        date = record.get("date", "")
-        vo2max = record.get("vo2max", "")
-        activity = record.get("activity_type", "")
-        self.logger.info(f"Inserted: {date} - {activity} VO2 Max: {vo2max}")
-
-    def _log_skip(self, record: Dict[str, Any]) -> None:
-        """Log skip with date"""
-        date = record.get("date", "")
-        self.logger.debug(f"Skipped: {date} (already exists)")
