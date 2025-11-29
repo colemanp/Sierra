@@ -3,7 +3,8 @@
 Token-efficient keys:
   d=date, hr=heart rate (bpm), n=count
   cur=current/latest, rng=range, s=start, e=end
-  avg=average, min=minimum, max=maximum, std=std deviation
+  avg=average, min=minimum, max=maximum, std=std deviation, chg=change
+  hidden=excluded from queries
 """
 import sqlite3
 from pathlib import Path
@@ -38,6 +39,7 @@ def get_rhr_summary() -> dict:
         cur = conn.execute("""
             SELECT measurement_date, resting_hr
             FROM resting_heart_rate
+            WHERE hidden = 0 OR hidden IS NULL
             ORDER BY measurement_date DESC
             LIMIT 1
         """).fetchone()
@@ -50,6 +52,7 @@ def get_rhr_summary() -> dict:
                    MAX(measurement_date) as e,
                    COUNT(*) as n
             FROM resting_heart_rate
+            WHERE hidden = 0 OR hidden IS NULL
         """).fetchone()
 
         return {
@@ -87,6 +90,7 @@ def get_rhr_trend(period: str = "month", limit: int = 12) -> dict:
                     MIN(resting_hr) as min_hr,
                     MAX(resting_hr) as max_hr
                 FROM resting_heart_rate
+                WHERE hidden = 0 OR hidden IS NULL
                 GROUP BY p
                 ORDER BY p DESC
                 LIMIT ?
@@ -101,6 +105,7 @@ def get_rhr_trend(period: str = "month", limit: int = 12) -> dict:
                     MIN(resting_hr) as min_hr,
                     MAX(resting_hr) as max_hr
                 FROM resting_heart_rate
+                WHERE hidden = 0 OR hidden IS NULL
                 GROUP BY p
                 ORDER BY p DESC
                 LIMIT ?
@@ -132,7 +137,7 @@ def get_rhr_records(
     """Get paginated resting HR records"""
     conn = _get_conn()
     try:
-        conditions = []
+        conditions = ["(hidden = 0 OR hidden IS NULL)"]
         params = []
 
         if start_date:
@@ -142,7 +147,7 @@ def get_rhr_records(
             conditions.append("measurement_date <= ?")
             params.append(end_date)
 
-        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        where = f"WHERE {' AND '.join(conditions)}"
 
         count = conn.execute(f"""
             SELECT COUNT(*) FROM resting_heart_rate
@@ -181,7 +186,7 @@ def get_rhr_stats(
     """Get statistical summary of resting heart rate"""
     conn = _get_conn()
     try:
-        conditions = []
+        conditions = ["(hidden = 0 OR hidden IS NULL)"]
         params = []
 
         if start_date:
@@ -191,7 +196,7 @@ def get_rhr_stats(
             conditions.append("measurement_date <= ?")
             params.append(end_date)
 
-        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        where = f"WHERE {' AND '.join(conditions)}"
 
         row = conn.execute(f"""
             SELECT COUNT(*) as n,
@@ -254,7 +259,8 @@ def get_rhr_compare(
                        MIN(resting_hr) as min_hr,
                        MAX(resting_hr) as max_hr
                 FROM resting_heart_rate
-                WHERE measurement_date >= ? AND measurement_date <= ?
+                WHERE (hidden = 0 OR hidden IS NULL)
+                  AND measurement_date >= ? AND measurement_date <= ?
             """, (start, end)).fetchone()
 
             if not row or row["n"] == 0:
@@ -282,6 +288,109 @@ def get_rhr_compare(
                 "min": p2["min"] - p1["min"],
                 "max": p2["max"] - p1["max"],
             },
+        }
+    finally:
+        conn.close()
+
+
+def hide_rhr_record(date: str, hidden: bool = True) -> dict:
+    """Hide or unhide a resting heart rate record by date"""
+    conn = _get_conn()
+    try:
+        # Check if record exists
+        row = conn.execute("""
+            SELECT id, resting_hr, hidden
+            FROM resting_heart_rate
+            WHERE measurement_date = ?
+        """, (date,)).fetchone()
+
+        if not row:
+            return {"err": f"No RHR record found for {date}"}
+
+        hidden_val = 1 if hidden else 0
+        conn.execute("""
+            UPDATE resting_heart_rate
+            SET hidden = ?
+            WHERE measurement_date = ?
+        """, (hidden_val, date))
+        conn.commit()
+
+        action = "hidden" if hidden else "unhidden"
+        return {
+            "ok": True,
+            "d": date,
+            "hr": row["resting_hr"],
+            "action": action,
+        }
+    finally:
+        conn.close()
+
+
+def hide_rhr_above(hr: int) -> dict:
+    """Hide all resting heart rate records above a threshold"""
+    conn = _get_conn()
+    try:
+        # Find records to hide
+        rows = conn.execute("""
+            SELECT measurement_date, resting_hr
+            FROM resting_heart_rate
+            WHERE resting_hr > ? AND (hidden = 0 OR hidden IS NULL)
+            ORDER BY resting_hr DESC
+        """, (hr,)).fetchall()
+
+        if not rows:
+            return {"ok": True, "n": 0, "msg": f"No visible records above {hr} bpm"}
+
+        # Hide them
+        conn.execute("""
+            UPDATE resting_heart_rate
+            SET hidden = 1
+            WHERE resting_hr > ? AND (hidden = 0 OR hidden IS NULL)
+        """, (hr,))
+        conn.commit()
+
+        # Return summary
+        hidden_hrs = [r["resting_hr"] for r in rows]
+        return {
+            "ok": True,
+            "n": len(rows),
+            "threshold": hr,
+            "range": {"min": min(hidden_hrs), "max": max(hidden_hrs)},
+        }
+    finally:
+        conn.close()
+
+
+def hide_rhr_below(hr: int) -> dict:
+    """Hide all resting heart rate records below a threshold"""
+    conn = _get_conn()
+    try:
+        # Find records to hide
+        rows = conn.execute("""
+            SELECT measurement_date, resting_hr
+            FROM resting_heart_rate
+            WHERE resting_hr < ? AND (hidden = 0 OR hidden IS NULL)
+            ORDER BY resting_hr ASC
+        """, (hr,)).fetchall()
+
+        if not rows:
+            return {"ok": True, "n": 0, "msg": f"No visible records below {hr} bpm"}
+
+        # Hide them
+        conn.execute("""
+            UPDATE resting_heart_rate
+            SET hidden = 1
+            WHERE resting_hr < ? AND (hidden = 0 OR hidden IS NULL)
+        """, (hr,))
+        conn.commit()
+
+        # Return summary
+        hidden_hrs = [r["resting_hr"] for r in rows]
+        return {
+            "ok": True,
+            "n": len(rows),
+            "threshold": hr,
+            "range": {"min": min(hidden_hrs), "max": max(hidden_hrs)},
         }
     finally:
         conn.close()

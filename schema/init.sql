@@ -149,6 +149,7 @@ CREATE TABLE IF NOT EXISTS resting_heart_rate (
     measurement_date TEXT NOT NULL,
     resting_hr INTEGER NOT NULL,
     source_name TEXT,
+    hidden INTEGER DEFAULT 0,
     import_id INTEGER REFERENCES import_log(id),
     created_at TEXT DEFAULT (datetime('now')),
     UNIQUE(source_id, measurement_date)

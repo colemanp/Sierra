@@ -53,6 +53,9 @@ from health_import.mcp.resting_hr import (
     get_rhr_records,
     get_rhr_stats,
     get_rhr_compare,
+    hide_rhr_record,
+    hide_rhr_above,
+    hide_rhr_below,
 )
 from health_import.mcp.vo2max import (
     get_vo2max_summary,
@@ -142,7 +145,7 @@ mcp = FastMCP(
         "Weight tools: weight_summary, weight_trend, weight_records, weight_stats, weight_compare. "
         "Nutrition tools: nutrition_summary, nutrition_trend, nutrition_day, nutrition_stats, nutrition_compare. "
         "Activity tools: activity_summary, activity_trend, activity_records, activity_stats, activity_compare. "
-        "Resting HR tools: rhr_summary, rhr_trend, rhr_records, rhr_stats, rhr_compare. "
+        "Resting HR tools: rhr_summary, rhr_trend, rhr_records, rhr_stats, rhr_compare, rhr_hide, rhr_hide_above, rhr_hide_below."
         "VO2 Max tools: vo2max_summary, vo2max_trend, vo2max_records, vo2max_stats, vo2max_compare. "
         "Strength tools: strength_summary, strength_trend, strength_records, strength_stats, strength_exercises, strength_compare."
     ),
@@ -161,10 +164,10 @@ async def weight_summary() -> dict:
     start = time.time()
     try:
         result = get_weight_summary()
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"weight_summary: {result['_tokens']} tokens, {duration_ms}ms")
-        log_mcp_request("weight_summary", {}, result, duration_ms, result["_tokens"])
+        logger.info(f"weight_summary: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request("weight_summary", {}, result, duration_ms, tokens)
         return result
     except Exception as e:
         logger.error(f"weight_summary error: {e}", exc_info=True)
@@ -187,15 +190,15 @@ async def weight_trend(period: str = "month", limit: int = 12) -> dict:
     start = time.time()
     try:
         result = get_weight_trend(period, limit)
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"weight_trend: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"weight_trend: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "weight_trend",
             {"period": period, "limit": limit},
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -228,9 +231,9 @@ async def weight_records(
     start = time.time()
     try:
         result = get_weight_records(start_date, end_date, page, min(page_size, 50))
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"weight_records: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"weight_records: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "weight_records",
             {
@@ -241,7 +244,7 @@ async def weight_records(
             },
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -265,15 +268,15 @@ async def weight_stats(start_date: str = None, end_date: str = None) -> dict:
     start = time.time()
     try:
         result = get_weight_stats(start_date, end_date)
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"weight_stats: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"weight_stats: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "weight_stats",
             {"start_date": start_date, "end_date": end_date},
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -308,9 +311,9 @@ async def weight_compare(
         result = get_weight_compare(
             period1_start, period1_end, period2_start, period2_end
         )
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"weight_compare: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"weight_compare: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "weight_compare",
             {
@@ -321,7 +324,7 @@ async def weight_compare(
             },
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -346,10 +349,10 @@ async def nutrition_summary() -> dict:
     start = time.time()
     try:
         result = get_nutrition_summary()
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"nutrition_summary: {result['_tokens']} tokens, {duration_ms}ms")
-        log_mcp_request("nutrition_summary", {}, result, duration_ms, result["_tokens"])
+        logger.info(f"nutrition_summary: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request("nutrition_summary", {}, result, duration_ms, tokens)
         return result
     except Exception as e:
         logger.error(f"nutrition_summary error: {e}", exc_info=True)
@@ -371,15 +374,15 @@ async def nutrition_trend(period: str = "day", limit: int = 14) -> dict:
     start = time.time()
     try:
         result = get_nutrition_trend(period, limit)
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"nutrition_trend: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"nutrition_trend: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "nutrition_trend",
             {"period": period, "limit": limit},
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -402,15 +405,15 @@ async def nutrition_day(date: str) -> dict:
     start = time.time()
     try:
         result = get_nutrition_day(date)
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"nutrition_day: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"nutrition_day: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "nutrition_day",
             {"date": date},
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -433,15 +436,15 @@ async def nutrition_stats(start_date: str = None, end_date: str = None) -> dict:
     start = time.time()
     try:
         result = get_nutrition_stats(start_date, end_date)
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"nutrition_stats: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"nutrition_stats: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "nutrition_stats",
             {"start_date": start_date, "end_date": end_date},
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -476,9 +479,9 @@ async def nutrition_compare(
         result = get_nutrition_compare(
             period1_start, period1_end, period2_start, period2_end
         )
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"nutrition_compare: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"nutrition_compare: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "nutrition_compare",
             {
@@ -489,7 +492,7 @@ async def nutrition_compare(
             },
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -514,10 +517,10 @@ async def activity_summary() -> dict:
     start = time.time()
     try:
         result = get_activity_summary()
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"activity_summary: {result['_tokens']} tokens, {duration_ms}ms")
-        log_mcp_request("activity_summary", {}, result, duration_ms, result["_tokens"])
+        logger.info(f"activity_summary: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request("activity_summary", {}, result, duration_ms, tokens)
         return result
     except Exception as e:
         logger.error(f"activity_summary error: {e}", exc_info=True)
@@ -539,15 +542,15 @@ async def activity_trend(period: str = "week", limit: int = 12) -> dict:
     start = time.time()
     try:
         result = get_activity_trend(period, limit)
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"activity_trend: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"activity_trend: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "activity_trend",
             {"period": period, "limit": limit},
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -585,9 +588,9 @@ async def activity_records(
         result = get_activity_records(
             activity_type, start_date, end_date, page, min(page_size, 50)
         )
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"activity_records: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"activity_records: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "activity_records",
             {
@@ -599,7 +602,7 @@ async def activity_records(
             },
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -629,9 +632,9 @@ async def activity_stats(
     start = time.time()
     try:
         result = get_activity_stats(activity_type, start_date, end_date)
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"activity_stats: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"activity_stats: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "activity_stats",
             {
@@ -641,7 +644,7 @@ async def activity_stats(
             },
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -676,9 +679,9 @@ async def activity_compare(
         result = get_activity_compare(
             period1_start, period1_end, period2_start, period2_end
         )
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"activity_compare: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"activity_compare: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "activity_compare",
             {
@@ -689,7 +692,7 @@ async def activity_compare(
             },
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -714,10 +717,10 @@ async def rhr_summary() -> dict:
     start = time.time()
     try:
         result = get_rhr_summary()
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"rhr_summary: {result['_tokens']} tokens, {duration_ms}ms")
-        log_mcp_request("rhr_summary", {}, result, duration_ms, result["_tokens"])
+        logger.info(f"rhr_summary: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request("rhr_summary", {}, result, duration_ms, tokens)
         return result
     except Exception as e:
         logger.error(f"rhr_summary error: {e}", exc_info=True)
@@ -739,15 +742,15 @@ async def rhr_trend(period: str = "month", limit: int = 12) -> dict:
     start = time.time()
     try:
         result = get_rhr_trend(period, limit)
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"rhr_trend: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"rhr_trend: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "rhr_trend",
             {"period": period, "limit": limit},
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -780,9 +783,9 @@ async def rhr_records(
     start = time.time()
     try:
         result = get_rhr_records(start_date, end_date, page, min(page_size, 50))
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"rhr_records: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"rhr_records: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "rhr_records",
             {
@@ -793,7 +796,7 @@ async def rhr_records(
             },
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -816,15 +819,15 @@ async def rhr_stats(start_date: str = None, end_date: str = None) -> dict:
     start = time.time()
     try:
         result = get_rhr_stats(start_date, end_date)
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"rhr_stats: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"rhr_stats: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "rhr_stats",
             {"start_date": start_date, "end_date": end_date},
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -859,9 +862,9 @@ async def rhr_compare(
         result = get_rhr_compare(
             period1_start, period1_end, period2_start, period2_end
         )
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"rhr_compare: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"rhr_compare: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "rhr_compare",
             {
@@ -872,11 +875,103 @@ async def rhr_compare(
             },
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
         logger.error(f"rhr_compare error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def rhr_hide(date: str, hidden: bool = True) -> dict:
+    """
+    Hide or unhide a resting heart rate record.
+
+    Args:
+        date: Date of the record to hide (YYYY-MM-DD)
+        hidden: True to hide, False to unhide (default True)
+
+    Hidden records are excluded from all RHR queries.
+    Returns confirmation with date, HR value, and action taken.
+    """
+    logger.info(f"MCP Tool Call: rhr_hide(date={date}, hidden={hidden})")
+    start = time.time()
+    try:
+        result = hide_rhr_record(date, hidden)
+        tokens = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"rhr_hide: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "rhr_hide",
+            {"date": date, "hidden": hidden},
+            result,
+            duration_ms,
+            tokens,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"rhr_hide error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def rhr_hide_above(hr: int) -> dict:
+    """
+    Hide all resting heart rate records above a threshold.
+
+    Args:
+        hr: Heart rate threshold (records > hr will be hidden)
+
+    Useful for removing outliers. Returns count of hidden records.
+    """
+    logger.info(f"MCP Tool Call: rhr_hide_above(hr={hr})")
+    start = time.time()
+    try:
+        result = hide_rhr_above(hr)
+        tokens = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"rhr_hide_above: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "rhr_hide_above",
+            {"hr": hr},
+            result,
+            duration_ms,
+            tokens,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"rhr_hide_above error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def rhr_hide_below(hr: int) -> dict:
+    """
+    Hide all resting heart rate records below a threshold.
+
+    Args:
+        hr: Heart rate threshold (records < hr will be hidden)
+
+    Useful for removing outliers. Returns count of hidden records.
+    """
+    logger.info(f"MCP Tool Call: rhr_hide_below(hr={hr})")
+    start = time.time()
+    try:
+        result = hide_rhr_below(hr)
+        tokens = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"rhr_hide_below: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "rhr_hide_below",
+            {"hr": hr},
+            result,
+            duration_ms,
+            tokens,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"rhr_hide_below error: {e}", exc_info=True)
         return {"error": str(e)}
 
 
@@ -897,10 +992,10 @@ async def vo2max_summary() -> dict:
     start = time.time()
     try:
         result = get_vo2max_summary()
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"vo2max_summary: {result['_tokens']} tokens, {duration_ms}ms")
-        log_mcp_request("vo2max_summary", {}, result, duration_ms, result["_tokens"])
+        logger.info(f"vo2max_summary: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request("vo2max_summary", {}, result, duration_ms, tokens)
         return result
     except Exception as e:
         logger.error(f"vo2max_summary error: {e}", exc_info=True)
@@ -922,15 +1017,15 @@ async def vo2max_trend(period: str = "month", limit: int = 12) -> dict:
     start = time.time()
     try:
         result = get_vo2max_trend(period, limit)
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"vo2max_trend: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"vo2max_trend: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "vo2max_trend",
             {"period": period, "limit": limit},
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -963,9 +1058,9 @@ async def vo2max_records(
     start = time.time()
     try:
         result = get_vo2max_records(start_date, end_date, page, min(page_size, 50))
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"vo2max_records: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"vo2max_records: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "vo2max_records",
             {
@@ -976,7 +1071,7 @@ async def vo2max_records(
             },
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -999,15 +1094,15 @@ async def vo2max_stats(start_date: str = None, end_date: str = None) -> dict:
     start = time.time()
     try:
         result = get_vo2max_stats(start_date, end_date)
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"vo2max_stats: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"vo2max_stats: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "vo2max_stats",
             {"start_date": start_date, "end_date": end_date},
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -1042,9 +1137,9 @@ async def vo2max_compare(
         result = get_vo2max_compare(
             period1_start, period1_end, period2_start, period2_end
         )
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"vo2max_compare: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"vo2max_compare: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "vo2max_compare",
             {
@@ -1055,7 +1150,7 @@ async def vo2max_compare(
             },
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -1080,10 +1175,10 @@ async def strength_summary() -> dict:
     start = time.time()
     try:
         result = get_strength_summary()
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"strength_summary: {result['_tokens']} tokens, {duration_ms}ms")
-        log_mcp_request("strength_summary", {}, result, duration_ms, result["_tokens"])
+        logger.info(f"strength_summary: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request("strength_summary", {}, result, duration_ms, tokens)
         return result
     except Exception as e:
         logger.error(f"strength_summary error: {e}", exc_info=True)
@@ -1110,15 +1205,15 @@ async def strength_trend(
     start = time.time()
     try:
         result = get_strength_trend(period, limit, exercise)
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"strength_trend: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"strength_trend: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "strength_trend",
             {"period": period, "limit": limit, "exercise": exercise},
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -1154,9 +1249,9 @@ async def strength_records(
     start = time.time()
     try:
         result = get_strength_records(exercise, start_date, end_date, page, min(page_size, 50))
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"strength_records: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"strength_records: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "strength_records",
             {
@@ -1168,7 +1263,7 @@ async def strength_records(
             },
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -1198,9 +1293,9 @@ async def strength_stats(
     start = time.time()
     try:
         result = get_strength_stats(exercise, start_date, end_date)
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"strength_stats: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"strength_stats: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "strength_stats",
             {
@@ -1210,7 +1305,7 @@ async def strength_stats(
             },
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
@@ -1230,10 +1325,10 @@ async def strength_exercises() -> dict:
     start = time.time()
     try:
         result = get_strength_exercises()
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"strength_exercises: {result['_tokens']} tokens, {duration_ms}ms")
-        log_mcp_request("strength_exercises", {}, result, duration_ms, result["_tokens"])
+        logger.info(f"strength_exercises: {tokens} tokens, {duration_ms}ms")
+        log_mcp_request("strength_exercises", {}, result, duration_ms, tokens)
         return result
     except Exception as e:
         logger.error(f"strength_exercises error: {e}", exc_info=True)
@@ -1267,9 +1362,9 @@ async def strength_compare(
         result = get_strength_compare(
             period1_start, period1_end, period2_start, period2_end
         )
-        result["_tokens"] = estimate_tokens(result)
+        tokens = estimate_tokens(result)
         duration_ms = int((time.time() - start) * 1000)
-        logger.info(f"strength_compare: {result['_tokens']} tokens, {duration_ms}ms")
+        logger.info(f"strength_compare: {tokens} tokens, {duration_ms}ms")
         log_mcp_request(
             "strength_compare",
             {
@@ -1280,7 +1375,7 @@ async def strength_compare(
             },
             result,
             duration_ms,
-            result["_tokens"],
+            tokens,
         )
         return result
     except Exception as e:
