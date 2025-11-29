@@ -18,6 +18,8 @@ from dashboard.components.strength import render_strength
 from dashboard.components.nutrition import render_nutrition
 from dashboard.components.imports import render_imports
 from dashboard.components.mcp import render_mcp
+from dashboard.components.resting_hr import render_resting_hr
+from dashboard.components.vo2max import render_vo2max
 
 
 def main():
@@ -41,11 +43,13 @@ def main():
         return
 
     # Main content tabs
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
         "Overview",
         "Activities",
         "Body",
         "Weight",
+        "Resting HR",
+        "VO2 Max",
         "Strength",
         "Nutrition",
         "Imports",
@@ -65,15 +69,21 @@ def main():
         render_weight(conn)
 
     with tab5:
-        render_strength(conn)
+        render_resting_hr(conn)
 
     with tab6:
-        render_nutrition(conn)
+        render_vo2max(conn)
 
     with tab7:
-        render_imports(conn)
+        render_strength(conn)
 
     with tab8:
+        render_nutrition(conn)
+
+    with tab9:
+        render_imports(conn)
+
+    with tab10:
         render_mcp(conn)
 
     # Close connection

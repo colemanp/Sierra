@@ -47,6 +47,18 @@ from health_import.mcp.activity import (
     get_activity_stats,
     get_activity_compare,
 )
+from health_import.mcp.resting_hr import (
+    get_rhr_summary,
+    get_rhr_trend,
+    get_rhr_records,
+    get_rhr_stats,
+)
+from health_import.mcp.vo2max import (
+    get_vo2max_summary,
+    get_vo2max_trend,
+    get_vo2max_records,
+    get_vo2max_stats,
+)
 
 # Setup logging
 LOG_DIR = Path(__file__).parent.parent.parent / "logs"
@@ -116,10 +128,12 @@ def log_mcp_request(
 mcp = FastMCP(
     name="sierra-health",
     instructions=(
-        "Health metrics tool for weight, nutrition, and activity data. "
+        "Health metrics tool for weight, nutrition, activity, resting heart rate, and VO2 Max data. "
         "Weight tools: weight_summary, weight_trend, weight_records, weight_stats, weight_compare. "
         "Nutrition tools: nutrition_summary, nutrition_trend, nutrition_day, nutrition_stats, nutrition_compare. "
-        "Activity tools: activity_summary, activity_trend, activity_records, activity_stats, activity_compare."
+        "Activity tools: activity_summary, activity_trend, activity_records, activity_stats, activity_compare. "
+        "Resting HR tools: rhr_summary, rhr_trend, rhr_records, rhr_stats. "
+        "VO2 Max tools: vo2max_summary, vo2max_trend, vo2max_records, vo2max_stats."
     ),
 )
 
@@ -669,6 +683,276 @@ async def activity_compare(
         return result
     except Exception as e:
         logger.error(f"activity_compare error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+# ============================================================================
+# Resting Heart Rate Tools
+# ============================================================================
+
+
+@mcp.tool()
+async def rhr_summary() -> dict:
+    """
+    Quick overview of resting heart rate data.
+
+    Returns latest reading, date range, and record count.
+    Optimized for minimal tokens (~30).
+    """
+    logger.info("MCP Tool Call: rhr_summary()")
+    start = time.time()
+    try:
+        result = get_rhr_summary()
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"rhr_summary: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request("rhr_summary", {}, result, duration_ms, result["_tokens"])
+        return result
+    except Exception as e:
+        logger.error(f"rhr_summary error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def rhr_trend(period: str = "month", limit: int = 12) -> dict:
+    """
+    Aggregated resting heart rate by time period.
+
+    Args:
+        period: Aggregation period - week, month, quarter, or year
+        limit: Number of periods to return (default 12)
+
+    Returns avg, min, max, count per period (~50-150 tokens).
+    """
+    logger.info(f"MCP Tool Call: rhr_trend(period={period}, limit={limit})")
+    start = time.time()
+    try:
+        result = get_rhr_trend(period, limit)
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"rhr_trend: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "rhr_trend",
+            {"period": period, "limit": limit},
+            result,
+            duration_ms,
+            result["_tokens"],
+        )
+        return result
+    except Exception as e:
+        logger.error(f"rhr_trend error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def rhr_records(
+    start_date: str = None,
+    end_date: str = None,
+    page: int = 1,
+    page_size: int = 30,
+) -> dict:
+    """
+    Paginated daily resting heart rate readings.
+
+    Args:
+        start_date: Filter start (YYYY-MM-DD), optional
+        end_date: Filter end (YYYY-MM-DD), optional
+        page: Page number (default 1)
+        page_size: Records per page (default 30, max 50)
+
+    Returns daily readings with pagination info. ~15 tokens per record.
+    """
+    logger.info(
+        f"MCP Tool Call: rhr_records(start={start_date}, end={end_date}, "
+        f"page={page}, size={page_size})"
+    )
+    start = time.time()
+    try:
+        result = get_rhr_records(start_date, end_date, page, min(page_size, 50))
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"rhr_records: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "rhr_records",
+            {
+                "start_date": start_date,
+                "end_date": end_date,
+                "page": page,
+                "page_size": page_size,
+            },
+            result,
+            duration_ms,
+            result["_tokens"],
+        )
+        return result
+    except Exception as e:
+        logger.error(f"rhr_records error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def rhr_stats(start_date: str = None, end_date: str = None) -> dict:
+    """
+    Statistical summary of resting heart rate.
+
+    Args:
+        start_date: Filter start (YYYY-MM-DD), optional
+        end_date: Filter end (YYYY-MM-DD), optional
+
+    Returns count, avg, min, max, std deviation (~40 tokens).
+    """
+    logger.info(f"MCP Tool Call: rhr_stats(start={start_date}, end={end_date})")
+    start = time.time()
+    try:
+        result = get_rhr_stats(start_date, end_date)
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"rhr_stats: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "rhr_stats",
+            {"start_date": start_date, "end_date": end_date},
+            result,
+            duration_ms,
+            result["_tokens"],
+        )
+        return result
+    except Exception as e:
+        logger.error(f"rhr_stats error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+# ============================================================================
+# VO2 Max Tools
+# ============================================================================
+
+
+@mcp.tool()
+async def vo2max_summary() -> dict:
+    """
+    Quick overview of VO2 Max data (running only).
+
+    Returns latest reading, date range, and record count.
+    Optimized for minimal tokens (~30).
+    """
+    logger.info("MCP Tool Call: vo2max_summary()")
+    start = time.time()
+    try:
+        result = get_vo2max_summary()
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"vo2max_summary: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request("vo2max_summary", {}, result, duration_ms, result["_tokens"])
+        return result
+    except Exception as e:
+        logger.error(f"vo2max_summary error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def vo2max_trend(period: str = "month", limit: int = 12) -> dict:
+    """
+    Aggregated VO2 Max by time period (running only).
+
+    Args:
+        period: Aggregation period - week, month, quarter, or year
+        limit: Number of periods to return (default 12)
+
+    Returns avg, min, max, count per period (~50-150 tokens).
+    """
+    logger.info(f"MCP Tool Call: vo2max_trend(period={period}, limit={limit})")
+    start = time.time()
+    try:
+        result = get_vo2max_trend(period, limit)
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"vo2max_trend: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "vo2max_trend",
+            {"period": period, "limit": limit},
+            result,
+            duration_ms,
+            result["_tokens"],
+        )
+        return result
+    except Exception as e:
+        logger.error(f"vo2max_trend error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def vo2max_records(
+    start_date: str = None,
+    end_date: str = None,
+    page: int = 1,
+    page_size: int = 30,
+) -> dict:
+    """
+    Paginated VO2 Max readings (running only).
+
+    Args:
+        start_date: Filter start (YYYY-MM-DD), optional
+        end_date: Filter end (YYYY-MM-DD), optional
+        page: Page number (default 1)
+        page_size: Records per page (default 30, max 50)
+
+    Returns readings with pagination info. ~12 tokens per record.
+    """
+    logger.info(
+        f"MCP Tool Call: vo2max_records(start={start_date}, end={end_date}, "
+        f"page={page}, size={page_size})"
+    )
+    start = time.time()
+    try:
+        result = get_vo2max_records(start_date, end_date, page, min(page_size, 50))
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"vo2max_records: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "vo2max_records",
+            {
+                "start_date": start_date,
+                "end_date": end_date,
+                "page": page,
+                "page_size": page_size,
+            },
+            result,
+            duration_ms,
+            result["_tokens"],
+        )
+        return result
+    except Exception as e:
+        logger.error(f"vo2max_records error: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
+@mcp.tool()
+async def vo2max_stats(start_date: str = None, end_date: str = None) -> dict:
+    """
+    Statistical summary of VO2 Max (running only).
+
+    Args:
+        start_date: Filter start (YYYY-MM-DD), optional
+        end_date: Filter end (YYYY-MM-DD), optional
+
+    Returns count, avg, min, max, std deviation (~40 tokens).
+    """
+    logger.info(f"MCP Tool Call: vo2max_stats(start={start_date}, end={end_date})")
+    start = time.time()
+    try:
+        result = get_vo2max_stats(start_date, end_date)
+        result["_tokens"] = estimate_tokens(result)
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info(f"vo2max_stats: {result['_tokens']} tokens, {duration_ms}ms")
+        log_mcp_request(
+            "vo2max_stats",
+            {"start_date": start_date, "end_date": end_date},
+            result,
+            duration_ms,
+            result["_tokens"],
+        )
+        return result
+    except Exception as e:
+        logger.error(f"vo2max_stats error: {e}", exc_info=True)
         return {"error": str(e)}
 
 

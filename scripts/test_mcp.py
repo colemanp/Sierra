@@ -31,6 +31,18 @@ from health_import.mcp.activity import (
     get_activity_stats,
     get_activity_compare,
 )
+from health_import.mcp.resting_hr import (
+    get_rhr_summary,
+    get_rhr_trend,
+    get_rhr_records,
+    get_rhr_stats,
+)
+from health_import.mcp.vo2max import (
+    get_vo2max_summary,
+    get_vo2max_trend,
+    get_vo2max_records,
+    get_vo2max_stats,
+)
 
 
 def estimate_tokens(data: dict) -> int:
@@ -333,6 +345,183 @@ def test_activity_compare():
     return tokens
 
 
+# ============================================================================
+# Resting HR Tests
+# ============================================================================
+
+
+def test_rhr_summary():
+    """Test rhr_summary - should be ~30 tokens"""
+    result = get_rhr_summary()
+    tokens = estimate_tokens(result)
+    print(f"\n=== rhr_summary ===")
+    print(f"Result: {json.dumps(result, indent=2)}")
+    print(f"Tokens: {tokens}")
+
+    # May have no data yet
+    if "err" in result:
+        print("[SKIP] No resting HR data")
+        return tokens
+
+    assert "cur" in result, "Missing 'cur' field"
+    assert "rng" in result, "Missing 'rng' field"
+    assert "hr" in result["cur"], "Missing 'hr' in cur"
+    assert tokens < 60, f"Token count too high: {tokens} > 60"
+    print("[PASS]")
+    return tokens
+
+
+def test_rhr_trend():
+    """Test rhr_trend - should scale with limit"""
+    result = get_rhr_trend("month", 3)
+    tokens = estimate_tokens(result)
+    print(f"\n=== rhr_trend (3 months) ===")
+    print(f"Result: {json.dumps(result, indent=2)}")
+    print(f"Tokens: {tokens}")
+
+    if "err" in result:
+        print("[SKIP] No resting HR data")
+        return tokens
+
+    assert "d" in result, "Missing 'd' field"
+    assert len(result["d"]) <= 3, f"Too many periods: {len(result['d'])}"
+    if result["d"]:
+        assert "p" in result["d"][0], "Missing 'p' (period) in trend data"
+        assert "avg" in result["d"][0], "Missing 'avg' in trend data"
+    assert tokens < 100, f"Token count too high: {tokens} > 100"
+    print("[PASS]")
+    return tokens
+
+
+def test_rhr_records():
+    """Test rhr_records - should paginate properly"""
+    result = get_rhr_records(page=1, page_size=10)
+    tokens = estimate_tokens(result)
+    print(f"\n=== rhr_records (10 records) ===")
+    print(f"Result: {json.dumps(result, indent=2)}")
+    print(f"Tokens: {tokens}")
+
+    assert "r" in result, "Missing 'r' field"
+    assert "pg" in result, "Missing 'pg' field"
+    assert "pgs" in result, "Missing 'pgs' field"
+    assert "n" in result, "Missing 'n' field"
+    assert len(result["r"]) <= 10, f"Too many records: {len(result['r'])}"
+    if result["r"]:
+        assert "hr" in result["r"][0], "Missing 'hr' in records"
+    assert tokens < 150, f"Token count too high: {tokens} > 150"
+    print("[PASS]")
+    return tokens
+
+
+def test_rhr_stats():
+    """Test rhr_stats - should be ~40 tokens"""
+    result = get_rhr_stats()
+    tokens = estimate_tokens(result)
+    print(f"\n=== rhr_stats ===")
+    print(f"Result: {json.dumps(result, indent=2)}")
+    print(f"Tokens: {tokens}")
+
+    if "err" in result:
+        print("[SKIP] No resting HR data")
+        return tokens
+
+    assert "n" in result, "Missing 'n' field"
+    assert "avg" in result, "Missing 'avg' field"
+    assert "min" in result, "Missing 'min' field"
+    assert "max" in result, "Missing 'max' field"
+    assert tokens < 80, f"Token count too high: {tokens} > 80"
+    print("[PASS]")
+    return tokens
+
+
+# ============================================================================
+# VO2 Max Tests
+# ============================================================================
+
+
+def test_vo2max_summary():
+    """Test vo2max_summary - should be ~30 tokens"""
+    result = get_vo2max_summary()
+    tokens = estimate_tokens(result)
+    print(f"\n=== vo2max_summary ===")
+    print(f"Result: {json.dumps(result, indent=2)}")
+    print(f"Tokens: {tokens}")
+
+    if "err" in result:
+        print("[SKIP] No VO2 Max data")
+        return tokens
+
+    assert "cur" in result, "Missing 'cur' field"
+    assert "rng" in result, "Missing 'rng' field"
+    assert "vo2" in result["cur"], "Missing 'vo2' in cur"
+    assert tokens < 60, f"Token count too high: {tokens} > 60"
+    print("[PASS]")
+    return tokens
+
+
+def test_vo2max_trend():
+    """Test vo2max_trend - should scale with limit"""
+    result = get_vo2max_trend("month", 3)
+    tokens = estimate_tokens(result)
+    print(f"\n=== vo2max_trend (3 months) ===")
+    print(f"Result: {json.dumps(result, indent=2)}")
+    print(f"Tokens: {tokens}")
+
+    if "err" in result:
+        print("[SKIP] No VO2 Max data")
+        return tokens
+
+    assert "d" in result, "Missing 'd' field"
+    assert len(result["d"]) <= 3, f"Too many periods: {len(result['d'])}"
+    if result["d"]:
+        assert "p" in result["d"][0], "Missing 'p' (period) in trend data"
+        assert "avg" in result["d"][0], "Missing 'avg' in trend data"
+    assert tokens < 100, f"Token count too high: {tokens} > 100"
+    print("[PASS]")
+    return tokens
+
+
+def test_vo2max_records():
+    """Test vo2max_records - should paginate properly"""
+    result = get_vo2max_records(page=1, page_size=10)
+    tokens = estimate_tokens(result)
+    print(f"\n=== vo2max_records (10 records) ===")
+    print(f"Result: {json.dumps(result, indent=2)}")
+    print(f"Tokens: {tokens}")
+
+    assert "r" in result, "Missing 'r' field"
+    assert "pg" in result, "Missing 'pg' field"
+    assert "pgs" in result, "Missing 'pgs' field"
+    assert "n" in result, "Missing 'n' field"
+    assert len(result["r"]) <= 10, f"Too many records: {len(result['r'])}"
+    if result["r"]:
+        assert "vo2" in result["r"][0], "Missing 'vo2' in records"
+    assert tokens < 150, f"Token count too high: {tokens} > 150"
+    print("[PASS]")
+    return tokens
+
+
+def test_vo2max_stats():
+    """Test vo2max_stats - should be ~40 tokens"""
+    result = get_vo2max_stats()
+    tokens = estimate_tokens(result)
+    print(f"\n=== vo2max_stats ===")
+    print(f"Result: {json.dumps(result, indent=2)}")
+    print(f"Tokens: {tokens}")
+
+    if "err" in result:
+        print("[SKIP] No VO2 Max data")
+        return tokens
+
+    assert "n" in result, "Missing 'n' field"
+    assert "avg" in result, "Missing 'avg' field"
+    assert "min" in result, "Missing 'min' field"
+    assert "max" in result, "Missing 'max' field"
+    assert tokens < 80, f"Token count too high: {tokens} > 80"
+    print("[PASS]")
+    return tokens
+
+
 def main():
     """Run all tests"""
     print("=" * 60)
@@ -369,7 +558,23 @@ def main():
         test_activity_compare,
     ]
 
-    for test_fn in weight_tests + nutrition_tests + activity_tests:
+    # Resting HR tests
+    rhr_tests = [
+        test_rhr_summary,
+        test_rhr_trend,
+        test_rhr_records,
+        test_rhr_stats,
+    ]
+
+    # VO2 Max tests
+    vo2max_tests = [
+        test_vo2max_summary,
+        test_vo2max_trend,
+        test_vo2max_records,
+        test_vo2max_stats,
+    ]
+
+    for test_fn in weight_tests + nutrition_tests + activity_tests + rhr_tests + vo2max_tests:
         try:
             test_fn()
             tests_passed += 1

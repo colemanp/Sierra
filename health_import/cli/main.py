@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from ..core.database import Database, DEFAULT_DB_PATH
+from ..core.database import Database, DEFAULT_DB_PATH, TEST_DB_PATH
 from ..core.logging_setup import setup_logging, get_logger
 from ..importers.garmin_activities import GarminActivitiesImporter
 from ..importers.garmin_weight import GarminWeightImporter
@@ -24,6 +24,15 @@ IMPORTERS = {
 }
 
 
+def get_db_path(args: argparse.Namespace) -> Path:
+    """Get database path from args"""
+    if args.db:
+        return Path(args.db)
+    if args.test:
+        return TEST_DB_PATH
+    return DEFAULT_DB_PATH
+
+
 def cmd_import(args: argparse.Namespace) -> int:
     """Handle import command"""
     logger = get_logger()
@@ -36,7 +45,7 @@ def cmd_import(args: argparse.Namespace) -> int:
         return 1
 
     # Initialize database
-    db_path = Path(args.db) if args.db else DEFAULT_DB_PATH
+    db_path = get_db_path(args)
     file_path = Path(args.file)
 
     try:
@@ -62,7 +71,7 @@ def cmd_import(args: argparse.Namespace) -> int:
 def cmd_inspect(args: argparse.Namespace) -> int:
     """Handle inspect command"""
     logger = get_logger()
-    db_path = Path(args.db) if args.db else DEFAULT_DB_PATH
+    db_path = get_db_path(args)
 
     try:
         with Database(db_path) as db:
@@ -101,7 +110,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
 def cmd_conflicts(args: argparse.Namespace) -> int:
     """Handle conflicts command"""
     logger = get_logger()
-    db_path = Path(args.db) if args.db else DEFAULT_DB_PATH
+    db_path = get_db_path(args)
 
     try:
         with Database(db_path) as db:
@@ -164,7 +173,7 @@ def cmd_conflicts(args: argparse.Namespace) -> int:
 def cmd_init(args: argparse.Namespace) -> int:
     """Initialize database"""
     logger = get_logger()
-    db_path = Path(args.db) if args.db else DEFAULT_DB_PATH
+    db_path = get_db_path(args)
 
     try:
         with Database(db_path) as db:
@@ -196,6 +205,11 @@ def main(argv: Optional[list] = None) -> int:
     parser.add_argument(
         "--db",
         help=f"Database path (default: {DEFAULT_DB_PATH})"
+    )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help=f"Use test database ({TEST_DB_PATH})"
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Commands")

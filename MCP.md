@@ -1,6 +1,6 @@
 # MCP Server - Sierra Health
 
-Model Context Protocol server for Claude Desktop. Exposes health data (weight/body composition, nutrition, and activity) with LLM-optimized query patterns.
+Model Context Protocol server for Claude Desktop. Exposes health data (weight/body composition, nutrition, activity, resting heart rate, and VO2 Max) with LLM-optimized query patterns.
 
 ## Claude Desktop Setup
 
@@ -271,12 +271,153 @@ Compare two periods. ~55 tokens.
 }
 ```
 
+## Resting HR Tools
+
+### rhr_summary
+
+Quick overview - latest reading + date range. ~24 tokens.
+
+```json
+{
+  "cur": {"d": "2025-11-24", "hr": 52},
+  "rng": {"s": "2018-09-12", "e": "2025-11-24", "n": 1654}
+}
+```
+
+### rhr_trend
+
+Aggregated by period. ~46-150 tokens.
+
+**Parameters:**
+- `period`: week | month | quarter | year
+- `limit`: number of periods (default 12)
+
+```json
+{
+  "d": [
+    {"p": "2025-10", "avg": 51, "min": 49, "max": 57, "n": 24},
+    {"p": "2025-11", "avg": 53, "min": 51, "max": 58, "n": 16}
+  ]
+}
+```
+
+### rhr_records
+
+Paginated daily readings. ~9 tokens per record.
+
+**Parameters:**
+- `start_date`: YYYY-MM-DD (optional)
+- `end_date`: YYYY-MM-DD (optional)
+- `page`: page number (default 1)
+- `page_size`: records per page (default 30, max 50)
+
+```json
+{
+  "r": [
+    {"d": "2025-11-24", "hr": 52},
+    {"d": "2025-11-22", "hr": 53}
+  ],
+  "pg": 1,
+  "pgs": 166,
+  "n": 1654
+}
+```
+
+### rhr_stats
+
+Statistical summary. ~13 tokens.
+
+**Parameters:**
+- `start_date`: YYYY-MM-DD (optional)
+- `end_date`: YYYY-MM-DD (optional)
+
+```json
+{
+  "n": 1654,
+  "avg": 56,
+  "min": 39,
+  "max": 103,
+  "std": 6
+}
+```
+
+## VO2 Max Tools
+
+### vo2max_summary
+
+Quick overview - latest reading + date range. ~30 tokens.
+
+```json
+{
+  "cur": {"d": "2025-11-27", "vo2": 50.1},
+  "rng": {"s": "2024-01-01", "e": "2025-11-27", "n": 738}
+}
+```
+
+### vo2max_trend
+
+Aggregated by period. ~50-150 tokens.
+
+**Parameters:**
+- `period`: week | month | quarter | year
+- `limit`: number of periods (default 12)
+
+```json
+{
+  "d": [
+    {"p": "2025-10", "avg": 49.8, "min": 49.2, "max": 50.3, "n": 12},
+    {"p": "2025-11", "avg": 50.0, "min": 49.6, "max": 50.3, "n": 15}
+  ]
+}
+```
+
+### vo2max_records
+
+Paginated readings. ~12 tokens per record.
+
+**Parameters:**
+- `start_date`: YYYY-MM-DD (optional)
+- `end_date`: YYYY-MM-DD (optional)
+- `page`: page number (default 1)
+- `page_size`: records per page (default 30, max 50)
+
+```json
+{
+  "r": [
+    {"d": "2025-11-27", "vo2": 50.1},
+    {"d": "2025-11-25", "vo2": 49.9}
+  ],
+  "pg": 1,
+  "pgs": 74,
+  "n": 738
+}
+```
+
+### vo2max_stats
+
+Statistical summary. ~15 tokens.
+
+**Parameters:**
+- `start_date`: YYYY-MM-DD (optional)
+- `end_date`: YYYY-MM-DD (optional)
+
+```json
+{
+  "n": 738,
+  "avg": 47.7,
+  "min": 44.8,
+  "max": 50.9,
+  "std": 1.3
+}
+```
+
 ## Token Efficiency
 
 Key mappings:
 - `d`=date, `t`=time, `wt`=weight, `fat`=body_fat, `m`=muscle, `b`=bone, `w`=water
 - `cal`=calories, `prot`=protein (in trend), `p`=protein (elsewhere), `f`=fat, `c`=carbs
 - `type`=activity_type, `dur`=duration (minutes), `dist`=distance (miles), `pace`=min/mile, `hr`=heart rate
+- `vo2`=VO2 Max (ml/kg/min)
 - `cur`=current/latest, `last`=latest, `rng`=range, `s`=start, `e`=end, `n`=count
 - `tot`=total, `items`=food items, `p`=period (in trend), `best`=best value
 - `r`=records, `pg`=page, `pgs`=pages
@@ -306,7 +447,9 @@ health_import/mcp/
 ├── server.py      # FastMCP server
 ├── weight.py      # Weight tool implementations
 ├── nutrition.py   # Nutrition tool implementations
-└── activity.py    # Activity tool implementations
+├── activity.py    # Activity tool implementations
+├── resting_hr.py  # Resting HR tool implementations
+└── vo2max.py      # VO2 Max tool implementations
 ```
 
 Logs: `logs/mcp.log`
